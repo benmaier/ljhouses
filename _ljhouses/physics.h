@@ -17,6 +17,18 @@ double total_kinetic_energy(
                         const vector < vector < double > > velocities
                      );
 
+void update_kinetic_energy(
+                        const vector < vector < double > > velocities,
+                        vector <double> &kinetic_energies
+                     );
+
+void update_total_energies(
+                        const vector <double> &kinetic_energies,
+                        const vector <double> &gravitational_energies,
+                        const vector <double> &LJ_energies,
+                        vector <double> &total_energies
+                   );
+
 double total_potential_energy(
             const vector < vector < double > > positions,
             const double &g

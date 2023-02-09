@@ -13,6 +13,39 @@ double total_kinetic_energy(
     
 }
 
+void update_total_energies(
+                        const vector <double> &kinetic_energies,
+                        const vector <double> &gravitational_energies,
+                        const vector <double> &LJ_energies,
+                        vector <double> &total_energies
+                   )
+{
+    auto K = kinetic_energies.begin();
+    auto V = gravitational_energies.begin();
+    auto Vij = LJ_energies.begin();
+    for(auto &H: total_energies)
+    {
+        H = (*K) + (*V) + (*Vij);
+
+        K++;
+        V++;
+        Vij++;
+    }
+}
+
+void update_kinetic_energy(
+                        const vector < vector < double > > velocities,
+                        vector <double> &kinetic_energies
+                     )
+{
+    auto this_energy = kinetic_energies.begin();
+    for(auto const &v: velocities){
+        (*this_energy) = 0.5*norm2(v);
+        this_energy++;
+    }
+}
+
+
 double total_potential_energy(
             const vector < vector < double > > positions,
             const double &g

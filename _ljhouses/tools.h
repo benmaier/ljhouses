@@ -10,4 +10,6 @@ double norm2(const vector < double > &vec);
 
 double norm(const vector < double > &vec);
 
+double sum(const vector < double > &vec);
+
 #endif
