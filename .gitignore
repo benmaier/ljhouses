@@ -11,6 +11,8 @@ a.out
 *.pickle
 *.pyc
 *.swp
+a.out
+*.gch
 
 /*.egg-info/
 /build/
