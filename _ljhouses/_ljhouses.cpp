@@ -46,9 +46,20 @@ PYBIND11_MODULE(_ljhouses, m)
 
         .. autosummary::
             :toctree: _generate
-
             simulation
 
     )pbdoc";
+
+    
+    py::class_<KDTree>(m, "KDTree", R"pbdoc(A k-d-Tree. Only miniscule interface to Python for testing purposes)pbdoc")
+        .def(py::init<>(),"Initialize an empty tree.")
+        .def(py::init< vector < vector < double > > &
+                     >(),
+             py::arg("positions"/*, "List of 2-Tuples containing (x, y)-positions"*/),
+             "Initialize a tree given a list of positions.")
+        .def("query_ball",
+             &KDTree::neighborhood,
+             R"pbdoc(Return a list of tuples, each tuple cotains (i) difference vector to from match to query point, (ii) squared distance of match to query point, and (iii) the index of the match. Ignores points at zero distance.)pbdoc"
+             );
 
 }
