@@ -25,6 +25,9 @@ ext_modules = [
     Extension(
         '_ljhouses',
         [
+            '_ljhouses/KDTree.cpp',
+            '_ljhouses/tools.cpp',
+            '_ljhouses/physics.cpp',
             '_ljhouses/_ljhouses.cpp',
         ],
         include_dirs=[
