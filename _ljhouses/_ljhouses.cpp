@@ -30,7 +30,9 @@
 #include <KDTree.h>
 #include <tools.h>
 #include <physics.h>
+#include <python_api_tools.h>
 
+using namespace pybind11::literals;
 using namespace std;
 namespace py = pybind11;
 
@@ -51,7 +53,7 @@ PYBIND11_MODULE(_ljhouses, m)
     )pbdoc";
 
     
-    py::class_<KDTree>(m, "KDTree", R"pbdoc(A k-d-Tree. Only miniscule interface to Python for testing purposes)pbdoc")
+    py::class_<KDTree>(m, "_KDTree", R"pbdoc(A k-d-Tree. Actually just needed internally. This here is only a miniscule interface to Python for testing purposes)pbdoc")
         .def(py::init<>(),"Initialize an empty tree.")
         .def(py::init< vector < vector < double > > &
                      >(),
@@ -61,5 +63,59 @@ PYBIND11_MODULE(_ljhouses, m)
              &KDTree::neighborhood,
              R"pbdoc(Return a list of tuples, each tuple cotains (i) difference vector to from match to query point, (ii) squared distance of match to query point, and (iii) the index of the match. Ignores points at zero distance.)pbdoc"
              );
+
+
+    m.def("_total_energies",
+          &update_total_energies_PYTHON,
+          R"pbdoc(For testing purposes. Each element of the last parameter will be updated with the sum of the corresponding elements in the first three parameters)pbdoc",
+          py::arg("kinetic_energies"),
+          py::arg("gravitational_energies"),
+          py::arg("LJ_energies")
+         );
+
+    m.def("_norm2", &norm2, R"pbdoc(Squared 2-norm of a vector.)pbdoc");
+    m.def("_norm", &norm, R"pbdoc(2-norm of a vector.)pbdoc");
+    m.def("_sum", &sum, R"pbdoc(Sum of all elements of a vector.)pbdoc");
+
+    m.def("_total_kinetic_energy",
+           &total_kinetic_energy,
+           R"pbdoc(Compute total kinetic energy given a list of velocities.)pbdoc",
+           "velocities"_a
+         );
+
+    m.def("_total_potential_energy",
+           &total_potential_energy,
+           R"pbdoc(Compute total potential energy given a list of positions.)pbdoc",
+           "positions"_a,
+           "gravitational_constant"_a
+         );
+
+    m.def("_LJ_force_and_energy",
+           &LJ_force_and_energy,
+           R"pbdoc(Compute the LJ-force and -energy between a single pair of particles.)pbdoc",
+           "r_pointing_towards_query_position"_a,
+           "rSquared"_a,
+           "LJ_r_Squared"_a,
+           "LJ_e"_a
+         );
+
+    m.def("_LJ_force_and_energy_on_particles",
+           &update_LJ_force_and_energy_on_particles_PYTHON,
+           R"pbdoc(Compute the LJ-forces and -energies between pairs of particles that lie within a certain distance.)pbdoc",
+           "positions"_a,
+           "LJ_r"_a,
+           "LJ_e"_a,
+           "LJ_Rmax"_a
+          );
+
+    m.def("_gravitational_force_and_energy_on_particles",
+           &update_gravitational_force_and_energy_on_particles_PYTHON,
+           R"pbdoc(Compute the gravitational forces and energies for a list of positions.)pbdoc",
+           "positions"_a,
+           "gravitational_constant"_a
+          );
+
+
+
 
 }

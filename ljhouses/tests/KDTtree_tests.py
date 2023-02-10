@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from ljhouses import KDTree as ljkd
+from ljhouses import _KDTree as ljkd
 from scipy.spatial import KDTree as sckd
 
 

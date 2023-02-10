@@ -15,5 +15,14 @@ from .metadata import (
     )
 
 from _ljhouses import (
-        KDTree,
+        _KDTree,
+        _LJ_force_and_energy,
+        _LJ_force_and_energy_on_particles,
+        _norm,
+        _norm2,
+        _sum,
+        _total_energies,
+        _total_kinetic_energy,
+        _total_potential_energy,
+        _gravitational_force_and_energy_on_particles,
     )

@@ -28,6 +28,7 @@ ext_modules = [
             '_ljhouses/KDTree.cpp',
             '_ljhouses/tools.cpp',
             '_ljhouses/physics.cpp',
+            '_ljhouses/python_api_tools.cpp',
             '_ljhouses/_ljhouses.cpp',
         ],
         include_dirs=[
