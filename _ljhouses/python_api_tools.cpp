@@ -77,3 +77,28 @@ pair <
     return make_pair(forces, energies);
 }
 
+pair <
+    vector <double>,
+    double
+> LJ_force_and_energy_PYTHON(
+                const vector <double> &r_pointing_towards_neighbor,
+                const double &rSquared,
+                const double &LJ_r,
+                const double &LJ_e
+             )
+{
+    vector <double> force(2);
+    double energy;
+
+    LJ_force_and_energy(
+            r_pointing_towards_neighbor,
+            rSquared,
+            LJ_r,
+            LJ_e,
+            force,
+            energy
+        );
+
+    return make_pair(force, energy);
+}
+

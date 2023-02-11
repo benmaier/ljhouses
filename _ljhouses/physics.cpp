@@ -58,19 +58,16 @@ double total_potential_energy(
     return V;
 }
 
-pair <
-        vector <double>,
-        double
-> LJ_force_and_energy(            
-                const vector <double> &r_pointing_towards_query_position,
+void LJ_force_and_energy(            
+                const vector <double> &r_pointing_towards_neighbor,
                 const double &rSquared,
                 const double &LJ_r_Squared,
-                const double &LJ_e
+                const double &LJ_e,
+                vector <double> &force,
+                double &energy
              )
 {
 
-    vector <double> force;
-    double energy;
     double r2 = LJ_r_Squared/rSquared;
     double r6 = r2*r2*r2;
     double r12 = r6*r6;
@@ -78,16 +75,14 @@ pair <
     double energy_base = LJ_e * (r12 - r6);
     energy = energy_base - LJ_e * r6; //convoluted way of saying LJ_e * (r12 - 2*r6)       
 
-    for(auto const &x_i: r_pointing_towards_query_position){
-        force.push_back(
-                    // the minus sign is already contained in how the
-                    // KD-Tree computes the diff vector r
-                    (x_i/rSquared) * 12 * energy_base
-                );
+    auto this_force_coord = force.begin();
+    for(auto const &x_i: r_pointing_towards_neighbor){
+        (*this_force_coord) = - (x_i/rSquared) * 12 * energy_base;
+        this_force_coord++;
     }
 
-    return make_pair(force, energy);
 }
+
 
 void update_LJ_force_and_energy_on_particles(
             const vector < vector <double> > &positions,
@@ -101,7 +96,7 @@ void update_LJ_force_and_energy_on_particles(
 
     double const LJ_r_Squared = LJ_r*LJ_r;
     double const Rmax2 = LJ_r_Squared / (LJ_Rmax*LJ_Rmax);
-    double const LJ_offset = LJ_e * (pow(Rmax2,6)-pow(Rmax2,3));
+    double const LJ_offset = LJ_e * (pow(Rmax2,6)-2*pow(Rmax2,3));
 
     for(auto &LJ_ener: LJ_energies)
         LJ_ener = 0.0;
@@ -114,6 +109,11 @@ void update_LJ_force_and_energy_on_particles(
     size_t this_particle_id = 0;
     auto this_force = forces.begin();
     auto this_energy = LJ_energies.begin();
+
+    // variables to wich force and energy will be written in pair-wise force call
+    vector <double> get_force(2,0.);
+    double get_energy = 0.0;
+
 
     for(auto const &pos: positions)
     {
@@ -142,27 +142,25 @@ void update_LJ_force_and_energy_on_particles(
             if (!pair_force_has_already_been_added)
             {
 
-                pair <
-                        vector <double>,
-                        double
-                > force_and_energy = 
-                    LJ_force_and_energy(
+                LJ_force_and_energy(
                            get<DIFFVEC>(neigh_entry),
                            get<DIST2>(neigh_entry),
                            LJ_r_Squared,
-                           LJ_e
+                           LJ_e,
+                           get_force,
+                           get_energy
                         );
                 
                 auto this_force_coord = this_force->begin();
                 auto neighbor_force_coord = forces[neigh].begin();
-                for(auto const &F_i: force_and_energy.first){
-                    (*this_force_coord) += F_i;
-                    (*neighbor_force_coord) -= F_i;
+                for(auto const &F_coord: get_force){
+                    (*this_force_coord) += F_coord;
+                    (*neighbor_force_coord) -= F_coord;
                     this_force_coord++;
                     neighbor_force_coord++;
                 }
 
-                double this_pairwise_energy = 0.5*(force_and_energy.second - LJ_offset);
+                double this_pairwise_energy = 0.5*(get_energy - LJ_offset);
                 (*this_energy) += this_pairwise_energy;
                 LJ_energies[neigh] += this_pairwise_energy;
 

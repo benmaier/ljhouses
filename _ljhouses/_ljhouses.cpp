@@ -91,9 +91,9 @@ PYBIND11_MODULE(_ljhouses, m)
          );
 
     m.def("_LJ_force_and_energy",
-           &LJ_force_and_energy,
+           &LJ_force_and_energy_PYTHON,
            R"pbdoc(Compute the LJ-force and -energy between a single pair of particles.)pbdoc",
-           "r_pointing_towards_query_position"_a,
+           "r_pointing_towards_neighbor"_a,
            "rSquared"_a,
            "LJ_r_Squared"_a,
            "LJ_e"_a

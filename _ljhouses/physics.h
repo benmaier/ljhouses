@@ -34,14 +34,13 @@ double total_potential_energy(
             const double &g
         );
 
-pair <
-        vector <double>,
-        double
-> LJ_force_and_energy(
-                const vector <double> &r_pointing_towards_query_position,
+void LJ_force_and_energy(
+                const vector <double> &r_pointing_towards_neighbor,
                 const double &rSquared,
                 const double &LJ_r,
-                const double &LJ_e
+                const double &LJ_e,
+                vector <double> &force,
+                double &energy
              );
 
 void update_LJ_force_and_energy_on_particles(

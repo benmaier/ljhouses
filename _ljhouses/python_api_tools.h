@@ -31,4 +31,14 @@ pair <
             const double &g
         );
 
+pair <
+    vector <double>,
+    double
+> LJ_force_and_energy_PYTHON(
+                const vector <double> &r_pointing_towards_neighbor,
+                const double &rSquared,
+                const double &LJ_r,
+                const double &LJ_e
+             );
+
 #endif
