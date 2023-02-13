@@ -10,6 +10,8 @@ from ljhouses import (
         _total_potential_energy,
         _gravitational_force_and_energy_on_particles,
         StochasticBerendsenThermostat,
+        NVEThermostat,
+        simulate_once,
     )
 
 from scipy.spatial import KDTree
@@ -50,6 +52,21 @@ def py_grav_force_and_energy_on_particles(pos, g):
                 - pos / r[:,None] * g,
                 r*g,
             )
+
+def update_verlet(x, v, a, dt, LJ_r, LJ_e, LJ_Rmax, g):
+
+    x += v * dt + a * 0.5*dt*dt
+
+    anew, pot_energy = py_grav_force_and_energy_on_particles(x, g)
+
+    LJ_force, LJ_energy = compute_LJ_force_and_energy(x, LJ_r, LJ_e, LJ_Rmax)
+    anew += LJ_force
+
+    v += (anew + a) * 0.5 * dt
+
+    a = anew
+
+    return (x, v, a, _total_kinetic_energy(v), pot_energy.sum(), LJ_energy.sum())
 
 
 
@@ -156,6 +173,52 @@ class PhysicsTest(unittest.TestCase):
         assert(all([np.allclose(fcpp, fpy) for fcpp, fpy in zip(forces_cpp, forces_py)]))
         assert(all([np.isclose(ecpp, epy) for ecpp, epy in zip(energies_cpp, energies_py)]))
 
+    def test_simulate_once(self):
+
+        thermostat = NVEThermostat()
+
+        N = 100
+        np.random.seed(2)
+        x = np.random.rand(N,2)*40
+        v = np.random.randn(N,2)
+        a = np.random.randn(N,2)
+        dt = 0.01
+        LJ_r = 2.5
+        LJ_e = 3.5
+        LJ_Rmax = 4*LJ_e
+        g = 0.1
+        Nsteps = 1
+        result_cpp = simulate_once(
+                x,v,a,
+                dt,
+                LJ_r,
+                LJ_e,
+                LJ_Rmax,
+                g,
+                Nsteps,
+                thermostat,
+            )
+        vec_cpp = xcpp, vcpp, acpp = result_cpp[:3]
+        enr_cpp = Kcpp, Vcpp, Vijcpp = result_cpp[3:]
+
+        result_py = update_verlet(
+                x,v,a,
+                dt,
+                LJ_r,
+                LJ_e,
+                LJ_Rmax,
+                g,
+            )
+
+        vec_py = xpy, vpy, apy = result_py[:3]
+        enr_py = Kpy, Vpy, Vijpy = result_py[3:]
+
+        for vpy, vcpp in zip(vec_py, vec_cpp):
+            assert(all([np.allclose(fcpp, fpy) for fcpp, fpy in zip(vcpp, vpy)]))
+
+        assert(np.allclose(enr_py, enr_cpp))
+
+
     def test_berendsen_thermostat(self):
 
         N = 1000
@@ -216,4 +279,5 @@ if __name__ == "__main__":
     T.test_LJ_force_and_energy_on_two_particles()
     T.test_LJ_force_and_energy_on_particles()
     T.test_gravitational_force_and_energy_on_particles()
-    T.test_berendsen_thermostat()
+    T.test_simulate_once()
+    #T.test_berendsen_thermostat()

@@ -59,7 +59,7 @@ void update_verlet(
         auto _a = a->begin();
         for(double &_f: f)
         {
-            _v += (_f + (*_a)) * dtHalf;
+            (*_v) += (_f + (*_a)) * dtHalf;
             _v++;
             _a++;
         }

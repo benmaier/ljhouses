@@ -29,3 +29,8 @@ from _ljhouses import (
         simulate_once,
         simulation,
     )
+
+class NVEThermostat(StochasticBerendsenThermostat):
+
+    def __init__(self,*args,**kwargs):
+        super().__init__()
