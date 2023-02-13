@@ -94,9 +94,9 @@ class StochasticBerendsenThermostat {
         }
 
         StochasticBerendsenThermostat(
+                    const double &target_root_mean_squared_velocity,
                     const size_t &N,
                     const size_t &dim,
-                    const double &target_root_mean_squared_velocity,
                     const double &berendsen_tau_as_multiple_of_dt = 10.0,
                     const double &_velocity_scale_lower_bound = 0.9,
                     const double &_velocity_scale_upper_bound = 1.1,
@@ -118,8 +118,13 @@ class StochasticBerendsenThermostat {
         }
 
         void thermalize(
-            vector < vector < double > > velocities,
+            vector < vector < double > > &velocities,
             const double &current_kinetic_energy
+        );
+
+        vector < vector < double > > get_thermalized_velocities(
+            vector < vector < double > > &velocities,
+            const double &current_kinetic_energy = -1.0
         );
 
 };

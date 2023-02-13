@@ -230,7 +230,7 @@ void update_gravitational_force_and_energy_on_particles(
 }
 
 void StochasticBerendsenThermostat::thermalize(
-        vector < vector < double > > velocities,
+        vector < vector < double > > &velocities,
         const double &current_kinetic_energy
     )
 {
@@ -248,4 +248,22 @@ void StochasticBerendsenThermostat::thermalize(
 
         scale(velocities, alpha);
     }
+}
+
+
+vector < vector < double > >
+StochasticBerendsenThermostat::get_thermalized_velocities(
+    vector < vector < double > > &velocities,
+    const double &current_kinetic_energy
+)
+{
+    double K;
+    if (current_kinetic_energy==-1.0)
+        K = total_kinetic_energy(velocities);
+    else
+        K = current_kinetic_energy;
+
+    thermalize(velocities, K);
+
+    return velocities;
 }

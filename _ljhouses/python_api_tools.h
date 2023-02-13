@@ -2,6 +2,7 @@
 #define PYTHON_API_TOOLS_H
 
 #include <physics.h>
+#include <simulations.h>
 
 vector <double> update_kinetic_energy_PYTHON(
                         const vector < vector < double > > velocities
@@ -40,5 +41,26 @@ pair <
                 const double &LJ_r,
                 const double &LJ_e
              );
+
+tuple <
+    vector < vector < double > >,
+    vector < vector < double > >,
+    vector < vector < double > >,
+    double,
+    double,
+    double
+>
+simulate_once_PYTHON(
+        vector < vector < double > > &positions,
+        vector < vector < double > > &velocities,
+        vector < vector < double > > &accelerations,
+        const double &dt,
+        const double &LJ_r,
+        const double &LJ_e,
+        const double &LJ_Rmax,
+        const double &g,
+        const size_t &Nsteps,
+        StochasticBerendsenThermostat &thermostat
+    );
 
 #endif

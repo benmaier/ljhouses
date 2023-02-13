@@ -117,6 +117,33 @@ PYBIND11_MODULE(_ljhouses, m)
           );
 
 
+    py::class_<StochasticBerendsenThermostat>(m,  "StochasticBerendsenThermostat", R"pbdoc(A stochastic Berendsen thermostat to rescale velocities in a way that replicates the canonical ensemble in the long term.)pbdoc")
+        .def(py::init<>(),"Initializing without argument will give you an inactive thermostat leading to a microcanonical (NVE) ensemble.")
+        .def(py::init< 
+                       const double &,
+                       const size_t &,
+                       const size_t &,
+                       const double &,
+                       const double &,
+                       const double &,
+                       const size_t &
+                     >(),
+             py::arg("target_root_mean_squared_velocity"),
+             py::arg("N"),
+             py::arg("dim") = 2,
+             py::arg("berendsen_tau_as_multiple_of_dt") = 10.0,
+             py::arg("velocity_scale_lower_bound") = 0.9,
+             py::arg("velocity_scale_upper_bound") = 1.1,
+             py::arg("seed") = 0,            
+             "Initialize stochastic Berendsen thermostat."
+            )
+        .def("get_thermalized_velocities",
+             &StochasticBerendsenThermostat::get_thermalized_velocities,
+             "Returns rescaled velocities according to the rules of the stochastic Berendsen thermostat.",
+             py::arg("velocities"),
+             py::arg("current_kinetic_energy") = -1.0
+            );
+
 
 
 }
