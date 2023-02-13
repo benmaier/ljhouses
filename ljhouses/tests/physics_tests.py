@@ -9,6 +9,7 @@ from ljhouses import (
         _total_kinetic_energy,
         _total_potential_energy,
         _gravitational_force_and_energy_on_particles,
+        StochasticBerendsenThermostat,
     )
 
 from scipy.spatial import KDTree
@@ -155,6 +156,57 @@ class PhysicsTest(unittest.TestCase):
         assert(all([np.allclose(fcpp, fpy) for fcpp, fpy in zip(forces_cpp, forces_py)]))
         assert(all([np.isclose(ecpp, epy) for ecpp, epy in zip(energies_cpp, energies_py)]))
 
+    def test_berendsen_thermostat(self):
+
+        N = 1000
+
+        init_root_v2 = 1.0
+        trg_root_v2 = 10.0
+        Ktrg = 0.5*N*trg_root_v2**2
+
+        #kinetic gas theory (https://en.wikipedia.org/wiki/Kinetic_theory_of_gases)
+        # K/Nf = kB T/2; natural units kB = 1 and Nf = 2*N in 2D
+        Ttrg = Ktrg / N
+        beta = 1/Ttrg
+
+        v = np.random.randn(N,2) * init_root_v2
+        therm = StochasticBerendsenThermostat(trg_root_v2,N,velocity_scale_upper_bound=1.9,velocity_scale_lower_bound=0.1)
+
+        nsteps = 20_000
+        K = _total_kinetic_energy(v)
+        Ks = [K]
+        for i in range(nsteps):
+            v = therm.get_thermalized_velocities(v, K)
+            K = _total_kinetic_energy(v)
+            Ks.append(K)
+
+        #import matplotlib.pyplot as pl
+
+        # in equilibrium, K should 
+        # follow an Erlang distribution (https://en.wikipedia.org/wiki/Erlang_distribution)
+        # as per Eq. (3) of https://arxiv.org/abs/0803.4060v1
+        # with k = N and lambda = beta.
+        # This distribution has mean k/lambda and variance k/lambda^2
+        K = np.array(Ks[1000:])
+
+        #print(f"{K.mean()=}", f"expected {N/beta=}")
+        #print(f"{K.std()=}", f"expected {np.sqrt(N)/beta=}")
+
+        assert(np.isclose(K.mean(), N/beta, rtol=1e-2))
+        assert(np.isclose(K.std(), np.sqrt(N)/beta, rtol=5e-2))
+
+
+        # comment this out if you want to to see a histogram
+        #from scipy.stats import erlang
+
+        #pdf, be, _ = pl.hist(K, bins=200, density=True)
+        #x = 0.5*(be[1:] + be[:-1])
+        #pl.plot(x,erlang.pdf(x, N, scale=1/beta))
+
+        #pl.show()
+
+
+
 if __name__ == "__main__":
 
     T = PhysicsTest()
@@ -164,3 +216,4 @@ if __name__ == "__main__":
     T.test_LJ_force_and_energy_on_two_particles()
     T.test_LJ_force_and_energy_on_particles()
     T.test_gravitational_force_and_energy_on_particles()
+    T.test_berendsen_thermostat()
