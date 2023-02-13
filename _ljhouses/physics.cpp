@@ -58,6 +58,30 @@ double total_potential_energy(
     return V;
 }
 
+double total_interaction_energy(
+        const vector < vector <double> > &positions,
+        const double &LJ_r,
+        const double &LJ_e,
+        const double &LJ_Rmax
+    )
+{
+    size_t N = positions.size();
+    vector <vector <double> > forces(N,{0.0,0.0});
+    vector <double> energies(N);
+
+    update_LJ_force_and_energy_on_particles(
+            positions,
+            LJ_r,
+            LJ_e,
+            LJ_Rmax,
+            forces,
+            energies
+          );
+
+    return sum(energies);
+
+}
+
 void LJ_force_and_energy(            
                 const vector <double> &r_pointing_towards_neighbor,
                 const double &rSquared,
@@ -205,3 +229,23 @@ void update_gravitational_force_and_energy_on_particles(
     }
 }
 
+void StochasticBerendsenThermostat::thermalize(
+        vector < vector < double > > velocities,
+        const double &current_kinetic_energy
+    )
+{
+    if (is_active)
+    {
+        const double dK =   (target_kinetic_energy - current_kinetic_energy) * dt_over_tau 
+                          + diffusion_scale * sqrt(current_kinetic_energy) * randn(rnd_gen);
+
+        double alpha = sqrt( 1.0 + dK / current_kinetic_energy );
+
+        if (alpha < velocity_scale_lower_bound)
+            alpha = velocity_scale_lower_bound;
+        else if (alpha > velocity_scale_upper_bound)
+            alpha = velocity_scale_upper_bound;
+
+        scale(velocities, alpha);
+    }
+}

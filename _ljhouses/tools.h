@@ -12,4 +12,10 @@ double norm(const vector < double > &vec);
 
 double sum(const vector < double > &vec);
 
+void scale(vector < vector < double > > &vec, const double &scalar);
+
+void scale(vector < double > &vec, const double &scalar);
+
+void set_to_zero(vector < vector < double > > &vec);
+
 #endif

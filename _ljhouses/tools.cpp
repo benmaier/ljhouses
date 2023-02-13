@@ -19,3 +19,23 @@ double sum(const vector < double > &vec){
     }
     return s;
 }
+
+void scale(vector < vector < double > > &vec, const double &scalar)
+{
+    for(auto &element: vec)
+        for(auto &coord: element)
+            coord *= scalar;
+}
+
+void scale(vector < double > &vec, const double &scalar)
+{
+    for(auto &element: vec)
+        element *= scalar;
+}
+
+void set_to_zero(vector < vector < double > > &vec)
+{
+    for(auto &element: vec)
+        for(auto &coord: element)
+            coord = 0.0;
+}

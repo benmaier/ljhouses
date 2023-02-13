@@ -1,6 +1,6 @@
 /*
  * The MIT License (MIT)
- * Copyright (c) 2022, Benjamin F. Maier
+ * Copyright (c) 2023, Benjamin F. Maier
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -30,9 +30,10 @@
 #include <KDTree.h>
 #include <tools.h>
 #include <physics.h>
+#include <simulations.h>
 #include <python_api_tools.h>
 
-using namespace pybind11::literals;
+using namespace pybind11::literals; // for using "parametername"_a instead of py::arg("parametername")
 using namespace std;
 namespace py = pybind11;
 
