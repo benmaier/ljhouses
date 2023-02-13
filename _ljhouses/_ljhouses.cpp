@@ -172,5 +172,4 @@ PYBIND11_MODULE(_ljhouses, m)
         "thermostat"_a
     );
 
-
 }

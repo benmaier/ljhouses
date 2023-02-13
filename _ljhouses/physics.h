@@ -85,12 +85,6 @@ class StochasticBerendsenThermostat {
 
         StochasticBerendsenThermostat(){
             is_active = false;
-            /*
-            target_kinetic_energy = -1;
-            dt_over_tau = -1;
-            diffusion_scale = -1;
-            */
-
         }
 
         StochasticBerendsenThermostat(
@@ -109,12 +103,18 @@ class StochasticBerendsenThermostat {
             velocity_scale_upper_bound = _velocity_scale_upper_bound;
 
             const double Nf = dim*N;
-            diffusion_scale = 2*sqrt(target_kinetic_energy*dt_over_tau/Nf);
-            dt_over_tau = 1/berendsen_tau_as_multiple_of_dt;
             target_kinetic_energy = 0.5 * N * pow(target_root_mean_squared_velocity,2);
+            dt_over_tau = 1.0/berendsen_tau_as_multiple_of_dt;
+            diffusion_scale = 2.0*sqrt(target_kinetic_energy*dt_over_tau/Nf);
 
             if (seed > 0)
                 rnd_gen.seed(seed);
+            else
+            {
+                random_device r;
+                seed_seq seed{r(), r(), r(), r(), r(), r(), r(), r()};
+                rnd_gen.seed(seed);
+            }
         }
 
         void thermalize(

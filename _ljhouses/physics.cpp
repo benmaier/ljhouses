@@ -1,4 +1,5 @@
 #include <physics.h>
+#include <iostream>
 
 double total_kinetic_energy(
                         const vector < vector < double > > velocities
@@ -236,10 +237,15 @@ void StochasticBerendsenThermostat::thermalize(
 {
     if (is_active)
     {
+        //cout << "target_kinetic_energy = " << target_kinetic_energy << endl;
+        //cout << "dt_over_tau = " << dt_over_tau << endl;
+        //cout << "diffusion_scale = " << diffusion_scale << endl;
         const double dK =   (target_kinetic_energy - current_kinetic_energy) * dt_over_tau 
                           + diffusion_scale * sqrt(current_kinetic_energy) * randn(rnd_gen);
+        //cout << "dK = " << dK << endl;
 
         double alpha = sqrt( 1.0 + dK / current_kinetic_energy );
+        //cout << "alpha = " << alpha << endl;
 
         if (alpha < velocity_scale_lower_bound)
             alpha = velocity_scale_lower_bound;
