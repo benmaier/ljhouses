@@ -62,7 +62,7 @@ PYBIND11_MODULE(_ljhouses, m)
              "Initialize a tree given a list of positions.")
         .def("query_ball",
              &KDTree::neighborhood,
-             R"pbdoc(Return a list of tuples, each tuple cotains (i) difference vector to from match to query point, (ii) squared distance of match to query point, and (iii) the index of the match. Ignores points at zero distance.)pbdoc"
+             R"pbdoc(Return a list of tuples, each tuple contains (i) difference vector to from match to query point, (ii) squared distance of match to query point, and (iii) the index of the match. Ignores points at zero distance.)pbdoc"
              );
 
 
@@ -144,6 +144,33 @@ PYBIND11_MODULE(_ljhouses, m)
              py::arg("current_kinetic_energy") = -1.0
             );
 
+    m.def("simulate_once", &simulate_once_PYTHON, "Run a simple single simulation that returns the final configuration as well as the current energies.",
+        "positions"_a,
+        "velocities"_a,
+        "accelerations"_a,
+        "dt"_a,
+        "LJ_r"_a,
+        "LJ_e"_a,
+        "LJ_Rmax"_a,
+        "g"_a,
+        "Nsteps"_a,
+        "thermostat"_a
+    );
+
+    m.def("simulation", &simulation, R"pbdoc(Run a chain of consecutive simulations, returning a list of configuration samples as well as time series for the respective energies in the system.)pbdoc",
+        "dt"_a,
+        "N_sampling_rounds"_a,
+        "N_steps_per_sample"_a,
+        "max_samples"_a,
+        "LJ_r"_a,
+        "LJ_e"_a,
+        "LJ_Rmax"_a,
+        "g"_a,
+        "positions"_a,
+        "velocities"_a,
+        "accelerations"_a,
+        "thermostat"_a
+    );
 
 
 }
