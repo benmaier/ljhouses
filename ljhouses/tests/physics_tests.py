@@ -21,6 +21,7 @@ from ljhouses.pythonsims import (
         py_grav_force_and_energy_on_particles,
         update_verlet,
         total_kinetic_energy,
+        simulate_once_python,
     )
 
 from scipy.spatial import KDTree
@@ -137,6 +138,9 @@ class PhysicsTest(unittest.TestCase):
         x = np.random.rand(N,2)*40
         v = np.random.randn(N,2)
         a = np.random.randn(N,2)
+        pos = x.copy()
+        vel = v.copy()
+        acc = a.copy()
         dt = 0.01
         LJ_r = 2.5
         LJ_e = 3.5
@@ -170,8 +174,40 @@ class PhysicsTest(unittest.TestCase):
 
         for vpy, vcpp in zip(vec_py, vec_cpp):
             assert(all([np.allclose(fcpp, fpy) for fcpp, fpy in zip(vcpp, vpy)]))
+        assert(np.allclose(enr_py, enr_cpp))
+
+        result_cpp = simulate_once(
+                pos,vel,acc,
+                dt,
+                LJ_r,
+                LJ_e,
+                LJ_Rmax,
+                g,
+                Nsteps+1,
+                thermostat,
+            )
+        vec_cpp = xcpp, vcpp, acpp = result_cpp[:3]
+        enr_cpp = Kcpp, Vcpp, Vijcpp = result_cpp[3:]
+
+        result_py = simulate_once_python(
+                pos,vel,acc,
+                dt,
+                LJ_r,
+                LJ_e,
+                LJ_Rmax,
+                g,
+                Nsteps+1,
+                thermostat = NVEThermostat()
+            )
+        vec_py = xpy, vpy, apy = result_py[:3]
+        enr_py = Kpy, Vpy, Vijpy = result_py[3:]
+
+        for vpy, vcpp in zip(vec_py, vec_cpp):
+            assert(all([np.allclose(fcpp, fpy) for fcpp, fpy in zip(vcpp, vpy)]))
 
         assert(np.allclose(enr_py, enr_cpp))
+
+
 
 
     def test_berendsen_thermostat(self):

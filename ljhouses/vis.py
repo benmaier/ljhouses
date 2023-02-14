@@ -1158,17 +1158,17 @@ if __name__=="__main__":     # pragma: no cover
 
     import numpy as np
 
-    N = 2000
+    N = 1000
     LJ_r = 6
     LJ_e = 3
-    LJ_Rmax = 3*LJ_r
-    g = 0.3
-    v0 = 10.0
+    LJ_Rmax = 4*LJ_r
+    g = 0.1
+    v0 = 6.0
     dt = 0.01
 
     x, v, a = get_lattice_initial_conditions(N, v0, LJ_r)
-    thermostat = StochasticBerendsenThermostat(v0, N, berendsen_tau_as_multiple_of_dt=100)
     thermostat = NVEThermostat()
+    thermostat = StochasticBerendsenThermostat(v0, N, berendsen_tau_as_multiple_of_dt=100)
     simulation_kwargs = dict(
             positions = x,
             velocities = v,
