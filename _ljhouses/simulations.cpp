@@ -119,11 +119,12 @@ void simulate_once(
             );
 
 
-        double K = total_kinetic_energy(velocities);
 
         // note that if the thermostat is inactive, it will leave the
         // velocities unchanged
+        double K = total_kinetic_energy(velocities);
         thermostat.thermalize(velocities, K);
+        K = total_kinetic_energy(velocities);
 
         t += dt;
         time.push_back(t);

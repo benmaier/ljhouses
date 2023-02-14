@@ -91,6 +91,15 @@ PYBIND11_MODULE(_ljhouses, m)
            "gravitational_constant"_a
          );
 
+    m.def("_total_interaction_energy",
+           &total_interaction_energy,
+           R"pbdoc(Compute total LJ interaction energy given a list of positions.)pbdoc",
+           "positions"_a,
+           "LJ_r"_a,
+           "LJ_e"_a,
+           "LJ_Rmax"_a
+         );
+
     m.def("_LJ_force_and_energy",
            &LJ_force_and_energy_PYTHON,
            R"pbdoc(Compute the LJ-force and -energy between a single pair of particles.)pbdoc",
@@ -142,7 +151,9 @@ PYBIND11_MODULE(_ljhouses, m)
              "Returns rescaled velocities according to the rules of the stochastic Berendsen thermostat.",
              py::arg("velocities"),
              py::arg("current_kinetic_energy") = -1.0
-            );
+            )
+        .def_readwrite("is_active", &StochasticBerendsenThermostat::is_active)
+        ;
 
     m.def("simulate_once", &simulate_once_PYTHON, "Run a simple single simulation that returns the final configuration as well as the current energies.",
         "positions"_a,

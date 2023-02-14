@@ -72,7 +72,6 @@ class StochasticBerendsenThermostat {
 
     private:
 
-        bool is_active;
         mt19937 rnd_gen;
         normal_distribution<double> randn{0.0,1.0};
         double velocity_scale_lower_bound;
@@ -82,6 +81,8 @@ class StochasticBerendsenThermostat {
         double diffusion_scale;
 
     public:
+
+        bool is_active;
 
         StochasticBerendsenThermostat(){
             is_active = false;
@@ -119,12 +120,12 @@ class StochasticBerendsenThermostat {
 
         void thermalize(
             vector < vector < double > > &velocities,
-            const double &current_kinetic_energy
+            double &current_kinetic_energy
         );
 
         vector < vector < double > > get_thermalized_velocities(
             vector < vector < double > > &velocities,
-            const double &current_kinetic_energy = -1.0
+            double current_kinetic_energy = -1.0
         );
 
 };

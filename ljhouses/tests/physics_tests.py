@@ -14,61 +14,16 @@ from ljhouses import (
         simulate_once,
     )
 
+from ljhouses.pythonsims import (
+        compute_LJ_force,
+        compute_LJ_energy,
+        compute_LJ_force_and_energy,
+        py_grav_force_and_energy_on_particles,
+        update_verlet,
+        total_kinetic_energy,
+    )
+
 from scipy.spatial import KDTree
-
-def compute_LJ_force(xi, xj, LJ_R2, LJ_energy):
-    rv = xj - xi
-    rSq = rv.dot(rv)
-    r2 = LJ_R2 / rSq
-    r6 = r2**3
-    r12 = r6**2
-    return -12*rv/rSq * LJ_energy * (r12-r6)
-
-def compute_LJ_energy(r2, LJ_R2, LJ_energy):
-    r2 = LJ_R2 / r2
-    r6 = r2**3
-    r12 = r6**2
-    return LJ_energy * (r12-2*r6)
-
-def compute_LJ_force_and_energy(pos, LJ_r, LJ_e, LJ_Rmax):
-    LJ_R2 = LJ_r**2
-    T = KDTree(pos)
-    forces = np.zeros_like(pos)
-    energies = np.zeros_like(pos[:,0])
-    offset = compute_LJ_energy(LJ_Rmax**2, LJ_R2, LJ_e)
-    for i, j in T.query_pairs(LJ_Rmax):
-        F = compute_LJ_force(pos[i], pos[j], LJ_R2, LJ_e)
-        r2 = ((pos[i] - pos[j])**2).sum()
-        V = compute_LJ_energy(r2, LJ_R2, LJ_e) - offset
-        forces[i] += F
-        forces[j] -= F
-        energies[i] += 0.5*V
-        energies[j] += 0.5*V
-    return forces, energies
-
-def py_grav_force_and_energy_on_particles(pos, g):
-    r = np.linalg.norm(pos,axis=1)
-    return (
-                - pos / r[:,None] * g,
-                r*g,
-            )
-
-def update_verlet(x, v, a, dt, LJ_r, LJ_e, LJ_Rmax, g):
-
-    x += v * dt + a * 0.5*dt*dt
-
-    anew, pot_energy = py_grav_force_and_energy_on_particles(x, g)
-
-    LJ_force, LJ_energy = compute_LJ_force_and_energy(x, LJ_r, LJ_e, LJ_Rmax)
-    anew += LJ_force
-
-    v += (anew + a) * 0.5 * dt
-
-    a = anew
-
-    return (x, v, a, _total_kinetic_energy(v), pot_energy.sum(), LJ_energy.sum())
-
-
 
 class PhysicsTest(unittest.TestCase):
 
@@ -87,7 +42,7 @@ class PhysicsTest(unittest.TestCase):
         N = 1000
         v = np.random.randn(N,2)
         Kcpp = _total_kinetic_energy(v)
-        Knp = 0.5*(v**2).sum()
+        Knp = total_kinetic_energy(v)
         assert(np.isclose(Kcpp, Knp))
 
     def test_total_potential_energy(self):

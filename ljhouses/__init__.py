@@ -24,6 +24,7 @@ from _ljhouses import (
         _total_energies,
         _total_kinetic_energy,
         _total_potential_energy,
+        _total_interaction_energy,
         _gravitational_force_and_energy_on_particles,
         StochasticBerendsenThermostat,
         simulate_once,

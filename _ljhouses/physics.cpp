@@ -232,7 +232,7 @@ void update_gravitational_force_and_energy_on_particles(
 
 void StochasticBerendsenThermostat::thermalize(
         vector < vector < double > > &velocities,
-        const double &current_kinetic_energy
+        double &current_kinetic_energy
     )
 {
     if (is_active)
@@ -243,14 +243,18 @@ void StochasticBerendsenThermostat::thermalize(
         const double dK =   (target_kinetic_energy - current_kinetic_energy) * dt_over_tau 
                           + diffusion_scale * sqrt(current_kinetic_energy) * randn(rnd_gen);
         //cout << "dK = " << dK << endl;
+        //
 
         double alpha = sqrt( 1.0 + dK / current_kinetic_energy );
+
         //cout << "alpha = " << alpha << endl;
 
         if (alpha < velocity_scale_lower_bound)
             alpha = velocity_scale_lower_bound;
         else if (alpha > velocity_scale_upper_bound)
             alpha = velocity_scale_upper_bound;
+
+        current_kinetic_energy *= pow(alpha,2);
 
         scale(velocities, alpha);
     }
@@ -260,7 +264,7 @@ void StochasticBerendsenThermostat::thermalize(
 vector < vector < double > >
 StochasticBerendsenThermostat::get_thermalized_velocities(
     vector < vector < double > > &velocities,
-    const double &current_kinetic_energy
+    double current_kinetic_energy
 )
 {
     double K;
