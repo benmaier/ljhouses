@@ -688,7 +688,7 @@ def get_network_batch(x, y,
                         shapes.Arc(_x,
                                    _y,
                                    radius,
-                                   segments=n_circle_segments+1,
+                                   segments=n_circle_segments,
                                    color=tuple(bytes.fromhex(node_stroke_color[1:])),
                                    batch=batch,
                                    )
@@ -787,7 +787,7 @@ def visualize(simulation_kwargs,
         ignored when plotted. Can be ``'E'``, ``'K'``, ``'V'``, or ``'Vij'``
     width : int, default = 800
         width of the particle visualization
-    simulation_api : 'py' or 'cpp', default = 'py'
+    simulation_api : 'py' or 'cpp' or function, default = 'py'
         which API to use for simulations (Python is faster)
 
     """
@@ -810,8 +810,10 @@ def visualize(simulation_kwargs,
 
     if simulation_api == 'py':
         simulate = simulate_once
-    else:
+    elif simulation_api == 'cpp':
         simulate = _simulate_once
+    else:
+        simulate = simulation_api
 
     # update the config and compute some helper variables
     cfg = deepcopy(_default_config)

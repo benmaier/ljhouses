@@ -6,7 +6,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from numpy.typing import NDArray
 from _ljhouses import StochasticBerendsenThermostat
-from ljhouses import NVEThermostat
+from ljhouses.tools import NVEThermostat, get_ideal_gas_initial_conditions
 
 Arr = NDArray[np.float64]
 f64 = np.float64
@@ -51,12 +51,14 @@ def compute_LJ_force_and_energy(pos: Arr,
                                 LJ_e: float,
                                 LJ_Rmax: float
                                 ) -> tuple[Arr, Arr]:
-    LJ_R2 = LJ_r**2
-    T = KDTree(pos)
+
     forces = np.zeros_like(pos)
     energies = np.zeros_like(pos[:,0])
-    if LJ_e == 0:
+    if LJ_e == 0.0:
         return forces, energies
+
+    LJ_R2 = LJ_r**2
+    T = KDTree(pos)
     offset = compute_LJ_energy(LJ_Rmax**2, LJ_R2, LJ_e)
     source_target_pairs = T.query_pairs(LJ_Rmax,output_type='ndarray')
     s = source_target_pairs[:,0]
@@ -119,7 +121,73 @@ def simulate(
         positions: Arr,
         velocities: Arr,
         accelerations: Arr,
+        thermostat: StochasticBerendsenThermostat | NVEThermostat = None,
     ) -> tuple[Samples, Arr, Arr, Arr, Arr]:
+    """
+    Run an MD simulation of LJ spheres in a linear potential,
+    returning configuration samples and respective time series
+    for all energies.
+
+    Parameters
+    ==========
+    dt : float
+        Time advancement per step
+    N_sampling_rounds : int
+        How many consecutive configuration sampling rounds to run
+    N_steps_per_sample : int
+        How many time steps to run per sampling round
+    max_samples : int
+        Maximum number of samples to save and return
+    LJ_r : float
+        Where the potential minimum lies in the pair-wise interaction
+        potential (can be thought of a single sphere's effective diameter)
+    LJ_e : float
+        Potential well depth in relation to gauge energy Vij = 0.
+    LJ_Rmax : float
+        Interaction forces and energies will not be computed for pairs
+        of spheres that lie farther than this distance
+    g : float
+        gravitational constant of linear gravitational potential
+    positions : numpy.ndarry
+        initial positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    velocities : numpy.ndarry
+        initial velocities of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    accelerations : numpy.ndarry
+        initial accelerations of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    thermostat : StochasticBerendsenThermostat | NVEThermostat, default = None
+        The thermostat to use to equilibrate. Passing `None` or `NVEThermostat`
+        will both result in simulating an NVE ensemble
+
+    Returns
+    =======
+    samples : list of tuples
+        A list containing the last samples that have been taken.
+        Each sample is a tuple of format
+
+        .. code:: python
+
+            (positions, velocities, accelerations)
+
+    t : numpy.ndarray
+        An array that contains every individual time step
+    K : numpy.ndarray
+        An array that contains the total kinetic energy at
+        every individual time step
+    V : numpy.ndarray
+        An array that contains the total gravitational energy at
+        every individual time step
+    Vij : numpy.ndarray
+        An array that contains the total interaction energy at
+        every individual time step
+    """
+
+    thermostat_is_active = thermostat is not None and thermostat.is_active
 
     x = positions
     v = velocities
@@ -136,6 +204,9 @@ def simulate(
     for sample in range(N_sampling_rounds):
         for step in range(N_steps_per_sample):
             x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e, LJ_Rmax, g)
+            if thermostat_is_active:
+                v = np.array(thermostat.get_thermalized_velocities(v, K))
+                K = total_kinetic_energy(v)
             t += dt
             time.append(t)
             kinetic_energy.append(K)
@@ -145,7 +216,13 @@ def simulate(
         if len(samples) > max_samples:
             samples = samples[1:]
 
-    return samples, time, kinetic_energy, potential_energy, interaction_energy
+    return (
+               samples,
+               np.array(time),
+               np.array(kinetic_energy),
+               np.array(potential_energy),
+               np.array(interaction_energy)
+           )
 
 def simulate_once(
         positions: Arr,
@@ -157,8 +234,68 @@ def simulate_once(
         LJ_Rmax: float,
         g: float,
         Nsteps: int,
-        thermostat: StochasticBerendsenThermostat | NVEThermostat,
+        thermostat: StochasticBerendsenThermostat | NVEThermostat = None,
     ) -> tuple[Arr, Arr, Arr, float, float, float]:
+    """
+    Run an MD simulation of LJ spheres in a linear potential, once.
+
+    Parameters
+    ==========
+    positions : numpy.ndarry
+        initial positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    velocities : numpy.ndarry
+        initial velocities of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    accelerations : numpy.ndarry
+        initial accelerations of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    dt : float
+        Time advancement per step
+    max_samples : int
+        Maximum number of samples to save and return
+    LJ_r : float
+        Where the potential minimum lies in the pair-wise interaction
+        potential (can be thought of a single sphere's effective diameter)
+    LJ_e : float
+        Potential well depth in relation to gauge energy Vij = 0.
+    LJ_Rmax : float
+        Interaction forces and energies will not be computed for pairs
+        of spheres that lie farther than this distance
+    g : float
+        gravitational constant of linear gravitational potential
+    N_steps_per_sample : int
+        How many time steps to run
+    thermostat : StochasticBerendsenThermostat | NVEThermostat, default = None
+        The thermostat to use to equilibrate. Passing `None` or `NVEThermostat`
+        will both result in simulating an NVE ensemble
+
+    Returns
+    =======
+    positions : numpy.ndarry
+        final positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    velocities : numpy.ndarry
+        final velocities of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    accelerations : numpy.ndarry
+        final accelerations of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    K : float
+        final total kinetic energy
+    V : float
+        final total gravitational energy
+    Vij : numpy.ndarray
+        final total interaction energy
+    """
+
+    thermostat_is_active = thermostat is not None and thermostat.is_active
 
     x = positions
     v = velocities
@@ -166,11 +303,222 @@ def simulate_once(
 
     for step in range(Nsteps):
         x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e, LJ_Rmax, g)
-        if thermostat.is_active:
+        if thermostat_is_active:
             v = np.array(thermostat.get_thermalized_velocities(v, K))
             K = total_kinetic_energy(v)
 
     return x, v, a, K, V, Vij
+
+
+def update_collisions(x: Arr,
+                      v: Arr,
+                      a: Arr,
+                      LJ_r: float,
+                      collision_strength: float = 0.9,
+                      ):
+
+    T = KDTree(x)
+    source_target_pairs = T.query_pairs(LJ_r,output_type='ndarray')
+    s = source_target_pairs[:,0]
+    t = source_target_pairs[:,1]
+    rv = x[s,:] - x[t,:]
+    r = np.linalg.norm(rv,axis=1)
+
+    x0 = x[:,0]
+    x1 = x[:,1]
+    v0 = v[:,0]
+    v1 = v[:,1]
+    a0 = a[:,0]
+    a1 = a[:,1]
+    D = rv * ((LJ_r-r)/2/r)[:,None]
+
+    D *= collision_strength
+    np.add.at(x0, s, D[:,0])
+    np.add.at(x0, t, -D[:,0])
+    np.add.at(x1, s, D[:,1])
+    np.add.at(x1, t, -D[:,1])
+
+    #D *= collision_strength**2
+    np.add.at(v0, s, D[:,0])
+    np.add.at(v0, t, -D[:,0])
+    np.add.at(v1, s, D[:,1])
+    np.add.at(v1, t, -D[:,1])
+
+    np.add.at(a0, s, D[:,0])
+    np.add.at(a0, t, -D[:,0])
+    np.add.at(a1, s, D[:,1])
+    np.add.at(a1, t, -D[:,1])
+
+    return T
+
+def simulate_collisions_once(
+        positions: Arr,
+        velocities: Arr,
+        accelerations: Arr,
+        dt: float,
+        LJ_r: float,
+        LJ_e: float,
+        LJ_Rmax: float,
+        g: float,
+        Nsteps: int,
+        *args,
+        thermostat: StochasticBerendsenThermostat | NVEThermostat = None,
+        **kwargs,
+    ) -> tuple[Arr, Arr, Arr, float, float, float]:
+    """
+    Run an collision simulation of LJ spheres, once.
+
+    Parameters
+    ==========
+    positions : numpy.ndarry
+        initial positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    velocities : numpy.ndarry
+        initial velocities of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    accelerations : numpy.ndarry
+        initial accelerations of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    dt : float
+        Time advancement per step
+    max_samples : int
+        Maximum number of samples to save and return
+    LJ_r : float
+        Where the potential minimum lies in the pair-wise interaction
+        potential (can be thought of a single sphere's effective diameter)
+    LJ_e : float
+        Potential well depth in relation to gauge energy Vij = 0.
+    LJ_Rmax : float
+        Interaction forces and energies will not be computed for pairs
+        of spheres that lie farther than this distance
+    g : float
+        gravitational constant of linear gravitational potential
+    N_steps_per_sample : int
+        How many time steps to run
+    thermostat : StochasticBerendsenThermostat | NVEThermostat, default = None
+        The thermostat to use to equilibrate. Passing `None` or `NVEThermostat`
+        will both result in simulating an NVE ensemble
+
+    Returns
+    =======
+    positions : numpy.ndarry
+        final positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    velocities : numpy.ndarry
+        final velocities of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    accelerations : numpy.ndarry
+        final accelerations of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    K : float
+        final total kinetic energy
+    V : float
+        final total gravitational energy
+    Vij : numpy.ndarray
+        final total interaction energy
+    """
+    thermostat_is_active = thermostat is not None and thermostat.is_active
+
+    x = positions
+    v = velocities
+    a = accelerations
+
+    for step in range(Nsteps):
+        update_collisions(x, v, a, LJ_r)
+        x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e=0, LJ_Rmax=0, g=0)
+        if thermostat_is_active:
+            K = total_kinetic_energy(v)
+            v = np.array(thermostat.get_thermalized_velocities(v, K))
+            K = total_kinetic_energy(v)
+
+    Vij = compute_LJ_force_and_energy(x, LJ_r, LJ_e, LJ_Rmax)[1]
+    V = compute_gravitational_force_and_energy(x, g)[1]
+
+    return x, v, a, K, V.sum(), Vij.sum()
+
+
+def get_close_to_equilibrium_initial_conditions(
+        N : int,
+        root_mean_squared_velocity: float,
+        LJ_r: float,
+        g: float,
+        dt: float,
+        *args,
+        **kwargs,
+    ) -> tuple[Arr, Arr, Arr]:
+    """
+    Initiate an ideal gas from kinetic gas theory.
+    Then run a collision simulation of LJ spheres of radius ``LJ_r/2``
+    until there's no pairs of spheres left that are within
+    distance < 0.99*LJ_r.
+    Then generate velocities according to Maxwell-Boltzmann distribution
+    and set accelerations to zero.
+
+    Parameters
+    ==========
+    N : int
+        number of spheres
+    root_mean_squared_velocity: float
+        ``sqrt(<v^2)``
+    LJ_r : float
+        Where the potential minimum lies in the pair-wise interaction
+        potential (can be thought of a single sphere's effective diameter)
+    LJ_e : float
+        Potential well depth in relation to gauge energy Vij = 0.
+    LJ_Rmax : float
+        Interaction forces and energies will not be computed for pairs
+        of spheres that lie farther than this distance
+    g : float
+        gravitational constant of linear gravitational potential
+    dt : float
+        Time advancement per step
+
+    Returns
+    =======
+    positions : numpy.ndarry
+        final positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    velocities : numpy.ndarry
+        final velocities of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    accelerations : numpy.ndarry
+        final accelerations of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    """
+
+    LJ_sigma = LJ_r/2**(1/6.)
+    cutoff = 0.99 * LJ_r
+
+    x, v, a = get_ideal_gas_initial_conditions(N, root_mean_squared_velocity, g)
+
+    v0 = v.copy()
+    a0 = a.copy()
+
+    thermostat = StochasticBerendsenThermostat(root_mean_squared_velocity, N)
+
+    T = KDTree(x)
+    pairs = T.query_pairs(LJ_sigma,output_type='ndarray')
+    while pairs.shape[0] != 0:
+
+        T = update_collisions(x, v, a, LJ_r)
+        x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e=0, LJ_Rmax=0, g=0)
+
+        K = total_kinetic_energy(v)
+        v = np.array(thermostat.get_thermalized_velocities(v, K))
+        K = total_kinetic_energy(v)
+
+        pairs = T.query_pairs(LJ_sigma,output_type='ndarray')
+
+    return x, v0, a0
 
 
 
