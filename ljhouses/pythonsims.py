@@ -4,11 +4,22 @@ for testing purposes.
 """
 import numpy as np
 from scipy.spatial import KDTree
+from numpy.typing import NDArray
+from _ljhouses import StochasticBerendsenThermostat
+from ljhouses import NVEThermostat
 
-def total_kinetic_energy(v):
+Arr = NDArray[np.float64]
+f64 = np.float64
+Samples = list[tuple[Arr,Arr,Arr]]
+
+def total_kinetic_energy(v: Arr) -> f64:
     return 0.5*(v**2).sum()
 
-def compute_LJ_force(xi, xj, LJ_R2, LJ_energy):
+def compute_LJ_force(xi: Arr,
+                     xj: Arr,
+                     LJ_R2: float,
+                     LJ_energy: float,
+                     ) -> Arr:
     rv = xj - xi
     rSq = rv.dot(rv)
     r2 = LJ_R2 / rSq
@@ -16,20 +27,30 @@ def compute_LJ_force(xi, xj, LJ_R2, LJ_energy):
     r12 = r6**2
     return -12*rv/rSq * LJ_energy * (r12-r6)
 
-def compute_LJ_force_arr(rv, rSq, LJ_R2, LJ_energy):
-    r_over_rSq = rv / rSq[:,None]
+def compute_LJ_force_arr(rv: Arr,
+                         rSq: Arr,
+                         LJ_R2: float,
+                         LJ_energy: float,
+                         ) -> Arr:
     r2 = LJ_R2/rSq
     r6 = r2**3
     r12 = r6**2
-    return -12 *r_over_rSq * LJ_energy * (r12[:,None]-r6[:,None])
+    return -12 * rv * LJ_energy * np.expand_dims((r12-r6)/rSq,-1)
 
-def compute_LJ_energy(rSq, LJ_R2, LJ_energy):
+def compute_LJ_energy(rSq: float | Arr,
+                      LJ_R2: float,
+                      LJ_energy: float,
+                      ) -> float | Arr:
     r2 = LJ_R2 / rSq
     r6 = r2**3
     r12 = r6**2
     return LJ_energy * (r12-2*r6)
 
-def compute_LJ_force_and_energy(pos, LJ_r, LJ_e, LJ_Rmax):
+def compute_LJ_force_and_energy(pos: Arr,
+                                LJ_r: float,
+                                LJ_e: float,
+                                LJ_Rmax: float
+                                ) -> tuple[Arr, Arr]:
     LJ_R2 = LJ_r**2
     T = KDTree(pos)
     forces = np.zeros_like(pos)
@@ -54,18 +75,28 @@ def compute_LJ_force_and_energy(pos, LJ_r, LJ_e, LJ_Rmax):
     np.add.at(energies, t, 0.5*V)
     return forces, energies
 
-def py_grav_force_and_energy_on_particles(pos, g):
+def compute_gravitational_force_and_energy(pos: Arr,
+                                          g: float,
+                                         ) -> tuple[Arr,Arr]:
     r = np.linalg.norm(pos,axis=1)
     return (
                 - pos / r[:,None] * g,
                 r*g,
             )
 
-def update_verlet(x, v, a, dt, LJ_r, LJ_e, LJ_Rmax, g):
+def update_verlet(x: Arr,
+                  v: Arr,
+                  a: Arr,
+                  dt: float,
+                  LJ_r: float,
+                  LJ_e: float,
+                  LJ_Rmax: float,
+                  g: float,
+                ) -> tuple[Arr,Arr,Arr,f64,f64,f64]:
 
     x += v * dt + a * 0.5*dt*dt
 
-    anew, pot_energy = py_grav_force_and_energy_on_particles(x, g)
+    anew, pot_energy = compute_gravitational_force_and_energy(x, g)
 
     LJ_force, LJ_energy = compute_LJ_force_and_energy(x, LJ_r, LJ_e, LJ_Rmax)
     anew += LJ_force
@@ -76,19 +107,19 @@ def update_verlet(x, v, a, dt, LJ_r, LJ_e, LJ_Rmax, g):
 
     return (x, v, a, total_kinetic_energy(v), pot_energy.sum(), LJ_energy.sum())
 
-def simulate_python(
-        dt,
-        N_sampling_rounds,
-        N_steps_per_sample,
-        max_samples,
-        LJ_r,
-        LJ_e,
-        LJ_Rmax,
-        g,
-        positions,
-        velocities,
-        accelerations
-    ):
+def simulate(
+        dt: float,
+        N_sampling_rounds: int,
+        N_steps_per_sample: int,
+        max_samples: int,
+        LJ_r: float,
+        LJ_e: float,
+        LJ_Rmax: float,
+        g: float,
+        positions: Arr,
+        velocities: Arr,
+        accelerations: Arr,
+    ) -> tuple[Samples, Arr, Arr, Arr, Arr]:
 
     x = positions
     v = velocities
@@ -99,7 +130,7 @@ def simulate_python(
     t = 0.0
     time = [t]
     kinetic_energy = [total_kinetic_energy(velocities)]
-    potential_energy = [py_grav_force_and_energy_on_particles(positions, g)[1]]
+    potential_energy = [compute_gravitational_force_and_energy(positions, g)[1]]
     interaction_energy = [compute_LJ_force_and_energy(positions, LJ_r, LJ_e, LJ_Rmax)[1]]
 
     for sample in range(N_sampling_rounds):
@@ -116,18 +147,19 @@ def simulate_python(
 
     return samples, time, kinetic_energy, potential_energy, interaction_energy
 
-def simulate_once_python(
-        positions,
-        velocities,
-        accelerations,
-        dt,
-        LJ_r,
-        LJ_e,
-        LJ_Rmax,
-        g,
-        Nsteps,
-        thermostat
-    ):
+def simulate_once(
+        positions: Arr,
+        velocities: Arr,
+        accelerations: Arr,
+        dt: float,
+        LJ_r: float,
+        LJ_e: float,
+        LJ_Rmax: float,
+        g: float,
+        Nsteps: int,
+        thermostat: StochasticBerendsenThermostat | NVEThermostat,
+    ) -> tuple[Arr, Arr, Arr, float, float, float]:
+
     x = positions
     v = velocities
     a = accelerations

@@ -1,4 +1,4 @@
-from ljhouses import simulation, StochasticBerendsenThermostat, NVEThermostat
+from ljhouses import StochasticBerendsenThermostat, NVEThermostat
 from ljhouses.tools import get_lattice_initial_conditions
 from ljhouses.vis import visualize
 
@@ -32,4 +32,4 @@ if __name__=="__main__":     # pragma: no cover
         )
 
     N_steps_per_frame = 10
-    visualize(simulation_kwargs, N_steps_per_frame, width=800,height=800)
+    visualize(simulation_kwargs, N_steps_per_frame, width=800)

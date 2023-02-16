@@ -1,8 +1,8 @@
 
-from ljhouses import simulation, StochasticBerendsenThermostat, NVEThermostat, _LJ_force_and_energy_on_particles
+from ljhouses import _simulation, StochasticBerendsenThermostat, NVEThermostat, _LJ_force_and_energy_on_particles
 from ljhouses.tools import get_lattice_initial_conditions
 
-from ljhouses.pythonsims import simulate_python, compute_LJ_force_and_energy
+from ljhouses.pythonsims import simulate, compute_LJ_force_and_energy
 
 from time import time
 

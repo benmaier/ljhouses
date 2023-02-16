@@ -11,17 +11,17 @@ from ljhouses import (
         _gravitational_force_and_energy_on_particles,
         StochasticBerendsenThermostat,
         NVEThermostat,
-        simulate_once,
+        _simulate_once,
     )
 
 from ljhouses.pythonsims import (
         compute_LJ_force,
         compute_LJ_energy,
         compute_LJ_force_and_energy,
-        py_grav_force_and_energy_on_particles,
+        compute_gravitational_force_and_energy,
         update_verlet,
         total_kinetic_energy,
-        simulate_once_python,
+        simulate_once,
     )
 
 from scipy.spatial import KDTree
@@ -124,7 +124,7 @@ class PhysicsTest(unittest.TestCase):
         g = np.pi
 
         forces_cpp, energies_cpp = _gravitational_force_and_energy_on_particles(pos, g)
-        forces_py, energies_py = py_grav_force_and_energy_on_particles(pos, g)
+        forces_py, energies_py = compute_gravitational_force_and_energy(pos, g)
 
         assert(all([np.allclose(fcpp, fpy) for fcpp, fpy in zip(forces_cpp, forces_py)]))
         assert(all([np.isclose(ecpp, epy) for ecpp, epy in zip(energies_cpp, energies_py)]))
@@ -147,7 +147,7 @@ class PhysicsTest(unittest.TestCase):
         LJ_Rmax = 4*LJ_e
         g = 0.1
         Nsteps = 1
-        result_cpp = simulate_once(
+        result_cpp = _simulate_once(
                 x,v,a,
                 dt,
                 LJ_r,
@@ -176,7 +176,7 @@ class PhysicsTest(unittest.TestCase):
             assert(all([np.allclose(fcpp, fpy) for fcpp, fpy in zip(vcpp, vpy)]))
         assert(np.allclose(enr_py, enr_cpp))
 
-        result_cpp = simulate_once(
+        result_cpp = _simulate_once(
                 pos,vel,acc,
                 dt,
                 LJ_r,
@@ -189,7 +189,7 @@ class PhysicsTest(unittest.TestCase):
         vec_cpp = xcpp, vcpp, acpp = result_cpp[:3]
         enr_cpp = Kcpp, Vcpp, Vijcpp = result_cpp[3:]
 
-        result_py = simulate_once_python(
+        result_py = simulate_once(
                 pos,vel,acc,
                 dt,
                 LJ_r,

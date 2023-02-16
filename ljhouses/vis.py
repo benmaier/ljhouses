@@ -15,13 +15,13 @@ from pyglet.window import key, mouse, Window
 from pyglet.gl import *
 
 from ljhouses import (
-        simulate_once,
+        _simulate_once,
         _total_interaction_energy,
         _total_kinetic_energy,
         _total_potential_energy,
     )
 
-from ljhouses.pythonsims import simulate_once_python
+from ljhouses.pythonsims import simulate_once
 
 _colors = [
             '#00997D', # paolo veronese green
@@ -256,11 +256,16 @@ class App(pyglet.window.Window):
             glLoadIdentity()
             glOrtho( self.left, self.right, self.bottom, self.top, 1, -1 )
         elif symbol == key.UP:
+            before = self.simulation_status.N_steps_per_frame
             self.simulation_status.N_steps_per_frame *= 1.2
             self.simulation_status.N_steps_per_frame = int(self.simulation_status.N_steps_per_frame)
+            if self.simulation_status.N_steps_per_frame == before:
+                self.simulation_status.N_steps_per_frame += 1
         elif symbol == key.DOWN:
             self.simulation_status.N_steps_per_frame /= 1.2
             self.simulation_status.N_steps_per_frame = int(self.simulation_status.N_steps_per_frame)
+            if self.simulation_status.N_steps_per_frame < 1:
+                self.simulation_status.N_steps_per_frame = 1
         elif symbol == key.SPACE:
             self.simulation_status.paused = not self.simulation_status.paused
 
@@ -703,7 +708,8 @@ _default_config = {
             'plot_sampled_curve': True,
             'n_circle_segments':16,
             'plot_height':120,
-            'bgcolor':'#eeeeee',
+            #'bgcolor':'#fefefe',
+            'bgcolor':'#f8f8f8',
             'curve_stroke_width':4.0,
             'node_stroke_width':2.0,
             'link_color': '#4b5a62',
@@ -735,8 +741,7 @@ def visualize(simulation_kwargs,
               N_steps_per_frame,
               config=None,
               ignore_energies=[],
-              width=400,
-              height=400,
+              width=800,
               simulation_api='py',
             ):
     """
@@ -745,47 +750,9 @@ def visualize(simulation_kwargs,
     Parameters
     ==========
     simulation_kwargs : dict
-        Keyword arguments of a simulation, will be fed to :func:`_ljhouses.simulate_once`.
-    network: dict
-        A stylized network in the netwulf-format
-        (see https://netwulf.readthedocs.io/en/latest/python_api/post_back.html)
-        where instead of 'x' and 'y', node positions are saved in 'x_canvas'
-        and 'y_canvas'. Example:
-
-        .. code:: python
-
-            stylized_network = {
-                "xlim": [0, 833],
-                "ylim": [0, 833],
-                "linkAlpha": 0.5,
-                "nodeStrokeWidth": 0.75,
-                "links": [
-                    {"source": 0, "target": 1, "width": 3.0 }
-                ],
-                "nodes": [
-                    {"id": 0,
-                     "x_canvas": 436.0933431058901,
-                     "y_canvas": 431.72418500564186,
-                     "radius": 20
-                     },
-                    {"id": 1,
-                     "x_canvas": 404.62184898400426,
-                     "y_canvas": 394.8158724310507,
-                     "radius": 20
-                     }
-                ]
-            }
-
-    N_steps_per_frame : float
-        The amount of simulation time that's supposed to pass
-        with a single update.
-    ignore_energies : list, default = []
-        List of compartment objects that are supposed to be
-        ignored when plotted.
-    quarantine_compartments : list, default = []
-        List of compartment objects that are supposed to be
-        resemble quarantine (i.e. temporarily
-        losing all connections)
+        Keyword arguments of a simulation, will be fed to :func:`ljhouses.simulate_once`.
+    N_steps_per_frame : int
+        How many steps to simulate per frame of the visualization
     config : dict, default = None
         A dictionary containing all possible configuration
         options. Entries in this dictionary will overwrite
@@ -815,6 +782,13 @@ def visualize(simulation_kwargs,
                         'padding':10,
                         'compartment_colors':_colors
                     }
+    ignore_energies : list, default = []
+        List of energy curves that are supposed to be
+        ignored when plotted. Can be ``'E'``, ``'K'``, ``'V'``, or ``'Vij'``
+    width : int, default = 800
+        width of the particle visualization
+    simulation_api : 'py' or 'cpp', default = 'py'
+        which API to use for simulations (Python is faster)
 
     """
 
@@ -828,15 +802,16 @@ def visualize(simulation_kwargs,
     g = simulation_kwargs['g']
     dt = simulation_kwargs['dt']
 
+    height = width
     main_width = width
     main_height = height
 
     energies = ['K', 'V', 'Vij', 'E']
 
     if simulation_api == 'py':
-        simulate = simulate_once_python
-    else:
         simulate = simulate_once
+    else:
+        simulate = _simulate_once
 
     # update the config and compute some helper variables
     cfg = deepcopy(_default_config)
@@ -1153,16 +1128,16 @@ def visualize(simulation_kwargs,
 if __name__=="__main__":     # pragma: no cover
 
 
-    from ljhouses import simulation, StochasticBerendsenThermostat, NVEThermostat
+    from ljhouses import StochasticBerendsenThermostat, NVEThermostat
     from ljhouses.tools import get_lattice_initial_conditions
 
     import numpy as np
 
-    N = 1000
+    N = 2000
     LJ_r = 6
-    LJ_e = 3
-    LJ_Rmax = 4*LJ_r
-    g = 0.1
+    LJ_e = 10
+    LJ_Rmax = 3*LJ_r
+    g = 0.2
     v0 = 6.0
     dt = 0.01
 

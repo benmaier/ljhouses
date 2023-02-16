@@ -1,8 +1,8 @@
 
-from ljhouses import simulation, StochasticBerendsenThermostat, NVEThermostat
+from ljhouses import _simulation, StochasticBerendsenThermostat, NVEThermostat
 from ljhouses.tools import get_lattice_initial_conditions
 
-from ljhouses.pythonsims import simulate_python
+from ljhouses.pythonsims import simulate
 
 from time import time
 
@@ -25,13 +25,13 @@ x, v, a = get_lattice_initial_conditions(N, v0, LJ_r)
 thermostat = NVEThermostat()
 
 start = time()
-samples, t, K, V, Vij = simulation(dt, N_rounds, N_steps_per_round, max_samples, LJ_r, LJ_e, LJ_Rmax, g, x, v, a, thermostat)
+samples, t, K, V, Vij = _simulation(dt, N_rounds, N_steps_per_round, max_samples, LJ_r, LJ_e, LJ_Rmax, g, x, v, a, thermostat)
 end = time()
 
 print("C++ API needed {0:4.2f} seconds".format(end-start))
 
 start = time()
-samples, t, K, V, Vij = simulate_python(dt, N_rounds, N_steps_per_round, max_samples, LJ_r, LJ_e, LJ_Rmax, g, x, v, a)
+samples, t, K, V, Vij = simulate(dt, N_rounds, N_steps_per_round, max_samples, LJ_r, LJ_e, LJ_Rmax, g, x, v, a)
 end = time()
 
 print("Python API needed {0:4.2f} seconds".format(end-start))

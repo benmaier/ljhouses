@@ -27,8 +27,8 @@ from _ljhouses import (
         _total_interaction_energy,
         _gravitational_force_and_energy_on_particles,
         StochasticBerendsenThermostat,
-        simulate_once,
-        simulation,
+        _simulate_once,
+        _simulation,
     )
 
 class NVEThermostat(StochasticBerendsenThermostat):

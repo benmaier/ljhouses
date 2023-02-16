@@ -155,7 +155,7 @@ PYBIND11_MODULE(_ljhouses, m)
         .def_readwrite("is_active", &StochasticBerendsenThermostat::is_active)
         ;
 
-    m.def("simulate_once", &simulate_once_PYTHON, "Run a simple single simulation that returns the final configuration as well as the current energies.",
+    m.def("_simulate_once", &simulate_once_PYTHON, "Run a simple single simulation that returns the final configuration as well as the current energies.",
         "positions"_a,
         "velocities"_a,
         "accelerations"_a,
@@ -168,7 +168,7 @@ PYBIND11_MODULE(_ljhouses, m)
         "thermostat"_a
     );
 
-    m.def("simulation", &simulation, R"pbdoc(Run a chain of consecutive simulations, returning a list of configuration samples as well as time series for the respective energies in the system.)pbdoc",
+    m.def("_simulation", &simulation, R"pbdoc(Run a chain of consecutive simulations, returning a list of configuration samples as well as time series for the respective energies in the system.)pbdoc",
         "dt"_a,
         "N_sampling_rounds"_a,
         "N_steps_per_sample"_a,

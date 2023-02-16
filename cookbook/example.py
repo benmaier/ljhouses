@@ -1,5 +1,5 @@
 
-from ljhouses import simulation, StochasticBerendsenThermostat, NVEThermostat
+from ljhouses import _simulation, StochasticBerendsenThermostat, NVEThermostat
 from ljhouses.tools import get_lattice_initial_conditions
 
 import numpy as np
@@ -16,7 +16,7 @@ x, v, a = get_lattice_initial_conditions(N, v0, LJ_r)
 thermostat = NVEThermostat()
 thermostat = StochasticBerendsenThermostat(10.0, N)
 
-samples, t, K, V, Vij = simulation(dt, 1_000, 1, 10, LJ_r, LJ_e, LJ_Rmax, g, x, v, a, thermostat)
+samples, t, K, V, Vij = _simulation(dt, 1_000, 1, 10, LJ_r, LJ_e, LJ_Rmax, g, x, v, a, thermostat)
 print(samples[-1][0][:2])
 print(samples[-2][0][:2])
 
