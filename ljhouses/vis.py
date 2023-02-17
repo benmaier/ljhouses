@@ -261,11 +261,13 @@ class App(pyglet.window.Window):
             self.simulation_status.N_steps_per_frame = int(self.simulation_status.N_steps_per_frame)
             if self.simulation_status.N_steps_per_frame == before:
                 self.simulation_status.N_steps_per_frame += 1
+            print("N_steps_per_frame =", self.simulation_status.N_steps_per_frame)
         elif symbol == key.DOWN:
             self.simulation_status.N_steps_per_frame /= 1.2
             self.simulation_status.N_steps_per_frame = int(self.simulation_status.N_steps_per_frame)
             if self.simulation_status.N_steps_per_frame < 1:
                 self.simulation_status.N_steps_per_frame = 1
+            print("N_steps_per_frame =", self.simulation_status.N_steps_per_frame)
         elif symbol == key.SPACE:
             self.simulation_status.paused = not self.simulation_status.paused
 
@@ -937,16 +939,27 @@ def visualize(simulation_kwargs,
         else:
             width += legend_width
 
+        time_label = pyglet.text.Label('t = 0',
+                                       font_name=('Helvetica', 'Arial', 'Sans'),
+                                       font_size=cfg['legend_font_size'],
+                                       x = 3,
+                                       y = height-3,
+                                       anchor_x='left', anchor_y='top',
+                                       color = list(bytes.fromhex(cfg['legend_font_color'][1:])) + [255],
+                                       batch=legend_batch,
+                                       )
+        legend_objects.append(time_label)
 
 
-    # overwrite network style with the epipack default style
-    #network['linkColor'] = cfg['link_color']
-    #network['nodeStrokeColor'] = cfg['node_stroke_color']
-    #for node in network['nodes']:
-    #    node['color'] = cfg['node_color']
-    #N = len(network['nodes'])
-    maxx = max(np.abs(x[:,0])) * 1.1
-    maxy = max(np.abs(x[:,1])) * 1.1
+
+        # overwrite network style with the epipack default style
+        #network['linkColor'] = cfg['link_color']
+        #network['nodeStrokeColor'] = cfg['node_stroke_color']
+        #for node in network['nodes']:
+        #    node['color'] = cfg['node_color']
+        #N = len(network['nodes'])
+        maxx = max(np.abs(x[:,0])) * 1.1
+        maxy = max(np.abs(x[:,1])) * 1.1
     maxxx = max(maxx, maxy)
 
     main_scl = Scale(bound_increase_factor=cfg['nodes_bound_increase_factor'],is_square_domain=True)\
@@ -1115,6 +1128,8 @@ def visualize(simulation_kwargs,
             #    disks[node].color = cfg['compartment_colors'][status]
 
 
+        time_label.text = f"t = {time[-1]:4.2f}"
+
     # schedule the app clock and run the app
     pyglet.clock.schedule_interval(update, cfg['update_dt'])
     pyglet.app.run()
@@ -1137,7 +1152,7 @@ if __name__=="__main__":     # pragma: no cover
 
     N = 2000
     LJ_r = 6
-    LJ_e = 10
+    LJ_e = 20
     LJ_Rmax = 3*LJ_r
     g = 0.2
     v0 = 6.0
@@ -1159,4 +1174,4 @@ if __name__=="__main__":     # pragma: no cover
         )
 
     N_steps_per_frame = 10
-    visualize(simulation_kwargs, N_steps_per_frame, width=800,height=800)
+    visualize(simulation_kwargs, N_steps_per_frame, width=800,)
