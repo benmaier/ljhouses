@@ -1080,7 +1080,7 @@ def visualize(simulation_kwargs,
         x, v, a, K, V, Vij = simulate(**simulation_kwargs)
 
 
-        time.append(time[-1] + N_steps_per_frame*dt)
+        time.append(time[-1] + N_steps_per_frame*simulation_kwargs['dt'])
 
         simstate.update(x, v, a)
 

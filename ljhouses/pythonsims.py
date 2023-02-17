@@ -198,8 +198,8 @@ def simulate(
     t = 0.0
     time = [t]
     kinetic_energy = [total_kinetic_energy(velocities)]
-    potential_energy = [compute_gravitational_force_and_energy(positions, g)[1]]
-    interaction_energy = [compute_LJ_force_and_energy(positions, LJ_r, LJ_e, LJ_Rmax)[1]]
+    potential_energy = [np.sum(compute_gravitational_force_and_energy(positions, g)[1])]
+    interaction_energy = [np.sum(compute_LJ_force_and_energy(positions, LJ_r, LJ_e, LJ_Rmax)[1])]
 
     for sample in range(N_sampling_rounds):
         for step in range(N_steps_per_sample):
