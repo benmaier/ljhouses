@@ -108,6 +108,7 @@ setup(
             'pybind11>=2.0.0',
             'numpy',
             'scipy',
+            'numba',
             ],
     classifiers=['License :: OSI Approved :: MIT License',
                  'Programming Language :: Python :: 3.6',

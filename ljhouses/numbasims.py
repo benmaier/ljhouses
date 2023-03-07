@@ -1,5 +1,5 @@
 """
-Simulation functions in pure python, mainly
+Simulation functions based on numba, mainly
 for testing purposes.
 """
 import numpy as np

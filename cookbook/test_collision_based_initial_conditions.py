@@ -6,12 +6,12 @@ from ljhouses.pythonsims import get_close_to_equilibrium_initial_conditions
 
 if __name__=="__main__":     # pragma: no cover
 
-    N = 2_000
+    N = 1_000
     LJ_r = 8
     LJ_e = 20
     LJ_Rmax = 3*LJ_r
-    g = 0.15
-    v0 = 5.0
+    g = 0.2
+    v0 = 6
     dt = 0.01
 
     x, v, a = get_close_to_equilibrium_initial_conditions(N, v0, LJ_r, g, dt)
@@ -29,5 +29,5 @@ if __name__=="__main__":     # pragma: no cover
             thermostat = thermostat,
         )
 
-    N_steps_per_frame = 50
+    N_steps_per_frame = 20
     visualize(simulation_kwargs, N_steps_per_frame, width=800)

@@ -1,19 +1,25 @@
 """
-Simulation functions in pure python, mainly
-for testing purposes.
+Simulation functions in pure python.
 """
 import numpy as np
 from scipy.spatial import KDTree
 from numpy.typing import NDArray
 from _ljhouses import StochasticBerendsenThermostat
-from ljhouses.tools import NVEThermostat, get_ideal_gas_initial_conditions
+from ljhouses.tools import NVEThermostat, get_ideal_gas_initial_conditions, np_2d_add_at
 
 Arr = NDArray[np.float64]
+IArr = NDArray[np.int64]
 f64 = np.float64
 Samples = list[tuple[Arr,Arr,Arr]]
 
 def total_kinetic_energy(v: Arr) -> f64:
     return 0.5*(v**2).sum()
+
+def total_interaction_energy(x: Arr, LJ_r: float, LJ_e: float, LJ_Rmax: float) -> f64:
+    return np.sum(compute_LJ_force_and_energy(positions, LJ_r, LJ_e, LJ_Rmax)[1])
+
+def total_potential_energy(x: Arr, g: float) -> f64:
+    return np.sum(compute_gravitational_force_and_energy(positions, g)[1])
 
 def compute_LJ_force(xi: Arr,
                      xj: Arr,
@@ -67,12 +73,7 @@ def compute_LJ_force_and_energy(pos: Arr,
     rSq = np.sum(rv**2,axis=1)
     F = compute_LJ_force_arr(rv, rSq, LJ_R2, LJ_e)
     V = compute_LJ_energy(rSq, LJ_R2, LJ_e) - offset
-    anew_0 = forces[:,0]
-    anew_1 = forces[:,1]
-    np.add.at(anew_0, s, F[:,0])
-    np.add.at(anew_0, t, -F[:,0])
-    np.add.at(anew_1, s, F[:,1])
-    np.add.at(anew_1, t, -F[:,1])
+    np_2d_add_at(forces, s, t, F)
     np.add.at(energies, s, 0.5*V)
     np.add.at(energies, t, 0.5*V)
     return forces, energies
@@ -324,30 +325,43 @@ def update_collisions(x: Arr,
     rv = x[s,:] - x[t,:]
     r = np.linalg.norm(rv,axis=1)
 
-    x0 = x[:,0]
-    x1 = x[:,1]
-    v0 = v[:,0]
-    v1 = v[:,1]
-    a0 = a[:,0]
-    a1 = a[:,1]
+    #x0 = x[:,0]
+    #x1 = x[:,1]
+    #v0 = v[:,0]
+    #v1 = v[:,1]
+    #a0 = a[:,0]
+    #a1 = a[:,1]
     D = rv * ((LJ_r-r)/2/r)[:,None]
 
     D *= collision_strength
-    np.add.at(x0, s, D[:,0])
-    np.add.at(x0, t, -D[:,0])
-    np.add.at(x1, s, D[:,1])
-    np.add.at(x1, t, -D[:,1])
+    DELTA = np.zeros_like(x)
+    np_2d_add_at(DELTA, s, t, D)
+
+    rDELTA = np.linalg.norm(DELTA,axis=1)
+    ind = np.where(rDELTA>LJ_r)[0]
+    DELTA[ind,:] = DELTA[ind,:]/rDELTA[ind,None] * LJ_r
+    rDELTA[ind] = LJ_r
+
+    rDELTA[rDELTA==0.0] = 1.0
+    DELTANORMED = DELTA / rDELTA[:,None]
+
+    vnorm = np.linalg.norm(v, axis=1)
+    anorm = np.linalg.norm(a, axis=1)
+    v[:,:] = DELTANORMED[:,:] * vnorm[:,None]
+    a[:,:] = DELTANORMED[:,:] * anorm[:,None]
+    x += DELTA
+
 
     #D *= collision_strength**2
-    np.add.at(v0, s, D[:,0])
-    np.add.at(v0, t, -D[:,0])
-    np.add.at(v1, s, D[:,1])
-    np.add.at(v1, t, -D[:,1])
+    #np.add.at(v0, s, D[:,0])
+    #np.add.at(v0, t, -D[:,0])
+    #np.add.at(v1, s, D[:,1])
+    #np.add.at(v1, t, -D[:,1])
 
-    np.add.at(a0, s, D[:,0])
-    np.add.at(a0, t, -D[:,0])
-    np.add.at(a1, s, D[:,1])
-    np.add.at(a1, t, -D[:,1])
+    #np.add.at(a0, s, D[:,0])
+    #np.add.at(a0, t, -D[:,0])
+    #np.add.at(a1, s, D[:,1])
+    #np.add.at(a1, t, -D[:,1])
 
     return T
 
@@ -429,9 +443,10 @@ def simulate_collisions_once(
     v = velocities
     a = accelerations
 
+    K = 0
     for step in range(Nsteps):
         update_collisions(x, v, a, LJ_r)
-        x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e=0, LJ_Rmax=0, g=0)
+        #x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e=0, LJ_Rmax=0, g=0)
         if thermostat_is_active:
             K = total_kinetic_energy(v)
             v = np.array(thermostat.get_thermalized_velocities(v, K))

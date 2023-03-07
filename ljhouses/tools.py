@@ -89,7 +89,7 @@ def get_ideal_gas_from_theory(N, mean_distance_to_center):
 def get_ideal_gas_from_kinetic_gas_theory(N,root_mean_squared_velocity,g):
     """
     Given a root mean squared velocity sqrt(<v^2>) and a gravitational
-    constant, generate ideal gas positions 
+    constant, generate ideal gas positions.
     """
     v2 = root_mean_squared_velocity**2
     T = 0.5 * v2 # in 2d: T = K/N and K = 0.5 * N * <v^2>
@@ -106,16 +106,30 @@ def xy2pos(x, y):
     """Given two 1d-arrays of shape (N,), return a 2d-array of shape (N, 2)"""
     return np.array([x,y]).T
 
-def get_pairwise_distances_ball(pos,Rmax):
+def get_pairwise_distances_ball(pos,Rmax,T=None):
     """Return an (N,)-shaped array that contains distances of all pairs that lie within distance Rmax"""
-    T = KDTree(pos)
+    T_is_None = T is None
+    if T_is_None:
+        T = KDTree(pos)
     source_target_pairs = T.query_pairs(Rmax,output_type='ndarray')
     s = source_target_pairs[:,0]
     t = source_target_pairs[:,1]
     rv = pos[t,:] - pos[s,:]
     r = np.linalg.norm(rv,axis=1)
-    del T
+    if T_is_None:
+        del T
     return r
+
+def np_2d_add_at(subject,
+              source_indices,
+              target_indices,
+              what_to_add
+              ):
+    """Add values to a 2d-array at `source_indices` and subtract the same at `target_indices`"""
+    np.add.at(subject[:,0], source_indices, what_to_add[:,0])
+    np.add.at(subject[:,0], target_indices, -what_to_add[:,0])
+    np.add.at(subject[:,1], source_indices, what_to_add[:,1])
+    np.add.at(subject[:,1], target_indices, -what_to_add[:,1])
 
 @njit
 def get_random_pairs(N, p):
