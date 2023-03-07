@@ -244,15 +244,21 @@ void StochasticBerendsenThermostat::thermalize(
                           + diffusion_scale * sqrt(current_kinetic_energy) * randn(rnd_gen);
         //cout << "dK = " << dK << endl;
         //
+        double alpha;
 
-        double alpha = sqrt( 1.0 + dK / current_kinetic_energy );
-
-        //cout << "alpha = " << alpha << endl;
-
-        if (alpha < velocity_scale_lower_bound)
+        if ((dK / current_kinetic_energy) < -1.0)
+        {
             alpha = velocity_scale_lower_bound;
-        else if (alpha > velocity_scale_upper_bound)
-            alpha = velocity_scale_upper_bound;
+        }
+        else
+        {
+            alpha = sqrt( 1.0 + dK / current_kinetic_energy );
+
+            if (alpha < velocity_scale_lower_bound)
+                alpha = velocity_scale_lower_bound;
+            else if (alpha > velocity_scale_upper_bound)
+                alpha = velocity_scale_upper_bound;
+        }
 
         current_kinetic_energy *= pow(alpha,2);
 
