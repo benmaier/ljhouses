@@ -213,7 +213,7 @@ def simulate(
             kinetic_energy.append(K)
             potential_energy.append(V)
             interaction_energy.append(Vij)
-        samples.append((x,v,a))
+        samples.append((x.copy(),v.copy(),a.copy()))
         if len(samples) > max_samples:
             samples = samples[1:]
 

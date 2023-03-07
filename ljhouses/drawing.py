@@ -28,7 +28,7 @@ def plot_configuration(x,radius,ax=None,facecolors='w',linewidths=1.5,edgecolors
                              heights=sizes,
                              angles=np.zeros_like(sizes),
                              units='x',
-                             offsets=x,
+                             offsets=x.copy(),
                              transOffset=ax.transData,
                              alpha=alpha,
                              facecolors=facecolors,
