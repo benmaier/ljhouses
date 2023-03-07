@@ -16,10 +16,10 @@ def total_kinetic_energy(v: Arr) -> f64:
     return 0.5*(v**2).sum()
 
 def total_interaction_energy(x: Arr, LJ_r: float, LJ_e: float, LJ_Rmax: float) -> f64:
-    return np.sum(compute_LJ_force_and_energy(positions, LJ_r, LJ_e, LJ_Rmax)[1])
+    return np.sum(compute_LJ_force_and_energy(x, LJ_r, LJ_e, LJ_Rmax)[1])
 
 def total_potential_energy(x: Arr, g: float) -> f64:
-    return np.sum(compute_gravitational_force_and_energy(positions, g)[1])
+    return np.sum(compute_gravitational_force_and_energy(x, g)[1])
 
 def compute_LJ_force(xi: Arr,
                      xj: Arr,
@@ -315,9 +315,11 @@ def update_collisions(x: Arr,
                       v: Arr,
                       a: Arr,
                       LJ_r: float,
-                      collision_strength: float = 0.9,
+                      collision_strength: float = 1.0,
                       ):
 
+    # construct KDTree and compute the distance
+    # for all pairs that lie within distance LJ_r
     T = KDTree(x)
     source_target_pairs = T.query_pairs(LJ_r,output_type='ndarray')
     s = source_target_pairs[:,0]
@@ -325,44 +327,43 @@ def update_collisions(x: Arr,
     rv = x[s,:] - x[t,:]
     r = np.linalg.norm(rv,axis=1)
 
-    #x0 = x[:,0]
-    #x1 = x[:,1]
-    #v0 = v[:,0]
-    #v1 = v[:,1]
-    #a0 = a[:,0]
-    #a1 = a[:,1]
+    # compute the amount that this single interaction should make the sphere should be move
     D = rv * ((LJ_r-r)/2/r)[:,None]
 
+    # scale by collision strength
     D *= collision_strength
+
+    # For each sphere, compute a Delta vector that says in which direction the sphere should move
+    # from summing up all the individual contributions
     DELTA = np.zeros_like(x)
     np_2d_add_at(DELTA, s, t, D)
 
+    # Threshold this vector by demanding that the change is not more than a diameter of the speheres 
     rDELTA = np.linalg.norm(DELTA,axis=1)
     ind = np.where(rDELTA>LJ_r)[0]
     DELTA[ind,:] = DELTA[ind,:]/rDELTA[ind,None] * LJ_r
     rDELTA[ind] = LJ_r
 
-    rDELTA[rDELTA==0.0] = 1.0
-    DELTANORMED = DELTA / rDELTA[:,None]
-
-    vnorm = np.linalg.norm(v, axis=1)
-    anorm = np.linalg.norm(a, axis=1)
-    v[:,:] = DELTANORMED[:,:] * vnorm[:,None]
-    a[:,:] = DELTANORMED[:,:] * anorm[:,None]
+    # add the Delta vector to the positions
     x += DELTA
 
+    # filter by which spheres actually need to change their position
+    not_changed = np.where(rDELTA==0.0)[0]
+    changed = np.where(rDELTA>0.0)[0]
 
-    #D *= collision_strength**2
-    #np.add.at(v0, s, D[:,0])
-    #np.add.at(v0, t, -D[:,0])
-    #np.add.at(v1, s, D[:,1])
-    #np.add.at(v1, t, -D[:,1])
+    # norm the the Delta vector for spheres that changed
+    rDELTA[not_changed] = 1.0
+    DELTANORMED = DELTA / rDELTA[:,None]
 
-    #np.add.at(a0, s, D[:,0])
-    #np.add.at(a0, t, -D[:,0])
-    #np.add.at(a1, s, D[:,1])
-    #np.add.at(a1, t, -D[:,1])
+    # for spheres that have changed position,
+    # reflect velocity and acceleration according to the
+    # corresponding DELTA vector
+    vnorm = np.linalg.norm(v, axis=1)
+    anorm = np.linalg.norm(a, axis=1)
+    v[changed,:] = DELTANORMED[changed,:] * vnorm[changed,None]
+    a[changed,:] = DELTANORMED[changed,:] * anorm[changed,None]
 
+    # return the tree
     return T
 
 def simulate_collisions_once(
@@ -376,6 +377,7 @@ def simulate_collisions_once(
         g: float,
         Nsteps: int,
         *args,
+        collision_strength: float = 1.0,
         thermostat: StochasticBerendsenThermostat | NVEThermostat = None,
         **kwargs,
     ) -> tuple[Arr, Arr, Arr, float, float, float]:
@@ -412,6 +414,9 @@ def simulate_collisions_once(
         gravitational constant of linear gravitational potential
     N_steps_per_sample : int
         How many time steps to run
+    collision_strength : float, default = 1.0
+        This is the scalar that the collision-vector will be scaled with
+        at each timestep
     thermostat : StochasticBerendsenThermostat | NVEThermostat, default = None
         The thermostat to use to equilibrate. Passing `None` or `NVEThermostat`
         will both result in simulating an NVE ensemble
@@ -445,17 +450,17 @@ def simulate_collisions_once(
 
     K = 0
     for step in range(Nsteps):
-        update_collisions(x, v, a, LJ_r)
-        #x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e=0, LJ_Rmax=0, g=0)
+        update_collisions(x, v, a, LJ_r, collision_strength=collision_strength)
+        x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e=0, LJ_Rmax=0, g=0)
         if thermostat_is_active:
-            K = total_kinetic_energy(v)
+            #K = total_kinetic_energy(v)
             v = np.array(thermostat.get_thermalized_velocities(v, K))
             K = total_kinetic_energy(v)
 
-    Vij = compute_LJ_force_and_energy(x, LJ_r, LJ_e, LJ_Rmax)[1]
-    V = compute_gravitational_force_and_energy(x, g)[1]
+    Vij = total_interaction_energy(x, LJ_r, LJ_e, LJ_Rmax)
+    V = total_potential_energy(x, g)
 
-    return x, v, a, K, V.sum(), Vij.sum()
+    return x, v, a, K, V, Vij
 
 
 def get_close_to_equilibrium_initial_conditions(
@@ -534,6 +539,77 @@ def get_close_to_equilibrium_initial_conditions(
         pairs = T.query_pairs(LJ_sigma,output_type='ndarray')
 
     return x, v0, a0
+
+
+
+def simulate_collisions_until_no_collisions(
+        positions:  Arr,
+        distance_cutoff: float,
+        root_mean_squared_velocity: float = 0,
+        dt: float = 0.01,
+        collision_strength: float = 1.0,
+        *args,
+        releps: float = 1e-3,
+        **kwargs,
+    ) -> tuple[Arr, Arr, Arr]:
+    """
+    Simulate N hard spheres of radius `distance_cutoff/2` until
+    there's no overlap anymore.
+
+    Parameters
+    ==========
+    positions : numpy.ndarry
+        initial positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    distance_cutoff : float
+        if the centers of two sphere are below this distance
+        we consider this as a collision
+    root_mean_squared_velocity: float
+        ``sqrt(<v^2>)``, if >0, we use this to support the
+        equilibration process using verlet integration
+    dt : float, default = 0.01
+        Time advancement per step, only used for the verlet
+        integration
+    collision_strength : float, default = 1.0
+        This is the scalar that the collision-vector will be scaled with
+        at each timestep
+    releps : float, default = 1e-3
+        relative tolerance in overlap (allow overlap that is ~(1-releps)*distance_cutoff)
+
+    Returns
+    =======
+    positions : numpy.ndarry
+        final positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    """
+
+    x = positions.copy()
+
+    N = x.shape[0]
+
+    v = np.random.randn(*x.shape) / np.sqrt(2) * root_mean_squared_velocity
+    a = np.zeros_like(v)
+
+    thermostat = StochasticBerendsenThermostat(root_mean_squared_velocity, N)
+
+    scl = 1-releps
+    T = KDTree(x)
+    pairs = T.query_pairs(distance_cutoff*scl,output_type='ndarray')
+    while pairs.shape[0] != 0:
+
+        T = update_collisions(x, v, a, distance_cutoff, collision_strength=collision_strength)
+        if root_mean_squared_velocity > 0:
+            x, v, a, K, V, Vij = update_verlet(x, v, a, dt, distance_cutoff, LJ_e=0, LJ_Rmax=0, g=0)
+
+            K = total_kinetic_energy(v)
+            v = np.array(thermostat.get_thermalized_velocities(v, K))
+            K = total_kinetic_energy(v)
+
+        pairs = T.query_pairs(distance_cutoff*scl,output_type='ndarray')
+
+    return x
 
 
 

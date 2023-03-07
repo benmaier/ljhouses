@@ -11,7 +11,7 @@ if __name__=="__main__":     # pragma: no cover
     LJ_r = 8
     LJ_e = 0
     LJ_Rmax = 3*6
-    g = 0.3
+    g = 0.05
     v0 = 1.5
     v1 = v0
     dt = 0.01
@@ -19,8 +19,8 @@ if __name__=="__main__":     # pragma: no cover
     x, v, a = get_ideal_gas_initial_conditions(N, v0, g)
     v = np.ones_like(v) * v1
     #v = np.zeros_like(v)
-    thermostat = StochasticBerendsenThermostat(v1, N, berendsen_tau_as_multiple_of_dt=0.1)
     thermostat = NVEThermostat()
+    thermostat = StochasticBerendsenThermostat(v1, N, berendsen_tau_as_multiple_of_dt=1)
     simulation_kwargs = dict(
             positions = x,
             velocities = v,
