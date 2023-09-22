@@ -322,6 +322,105 @@ def simulate_once(
     return x, v, a, K, V, Vij
 
 
+def _pair(a,b):
+    if a > b:
+        return b, a
+    elif a < b:
+        return a, b
+    else:
+        return None
+
+def update_collisions_varying_radius(
+                      x: Arr,
+                      radiuses: Arr,
+                      collision_strength: float = 1.0,
+                      eps: float = 1e-10,
+                      attract_within_diameter: bool = False,
+                      v: Arr = None,
+                      a: Arr = None,
+                    ):
+
+    # construct KDTree and compute the distance
+    # for all pairs that lie within distance LJ_r
+    T = KDTree(x)
+
+    N = x.shape[0]
+    source_target_pairs = set()
+    for i in range(N):
+        neighbors = T.query_ball_point(x[i], 2*radiuses[i])
+        for j in neighbors:
+            this_pair = _pair(i,j)
+            if this_pair is not None:
+                source_target_pairs.add(this_pair)
+
+    if len(source_target_pairs) == 0:
+        return None
+
+    source_target_pairs = np.array(list(source_target_pairs),dtype=int)
+    s = source_target_pairs[:,0]
+    t = source_target_pairs[:,1]
+    rv = x[s,:] - x[t,:]
+    r = np.linalg.norm(rv,axis=1)
+
+    LJ_r = radiuses[s] + radiuses[t]
+
+    overlap_indices = np.where(r < LJ_r)[0]
+    if len(overlap_indices) == 0 and not attract_within_diameter:
+        return None
+    elif len(overlap_indices) > 0 and not attract_within_diameter:
+        s = s[overlap_indices]
+        t = t[overlap_indices]
+        rv = rv[overlap_indices,:]
+        r = r[overlap_indices]
+        LJ_r = LJ_r[overlap_indices]
+
+    # compute the amount that this single interaction should make the sphere should be move
+    D = rv * ((LJ_r-r)/2/r)[:,None]
+
+    # scale by collision strength
+    D *= collision_strength
+
+    # For each sphere, compute a Delta vector that says in which direction the sphere should move
+    # from summing up all the individual contributions
+    DELTA = np.zeros_like(x)
+    np_2d_add_at(DELTA, s, t, D)
+
+    # Threshold this vector by demanding that the change is not more than a diameter of the speheres 
+    rDELTA = np.linalg.norm(DELTA,axis=1)
+    ind = np.where(rDELTA>2*radiuses)[0]
+    DELTA[ind,:] = DELTA[ind,:]/rDELTA[ind,None] * 2*radiuses[ind,None]
+    rDELTA[ind] = 2*radiuses[ind]
+
+    if not np.any(rDELTA>eps):
+        return None
+
+    # add the Delta vector to the positions
+    x += DELTA
+
+    if v is not None or a is not None:
+        # filter by which spheres actually need to change their position
+        not_changed = np.where(rDELTA==0.0)[0]
+        changed = np.where(rDELTA>0.0)[0]
+
+        # norm the the Delta vector for spheres that changed
+        rDELTA[not_changed] = 1.0
+        DELTANORMED = DELTA / rDELTA[:,None]
+
+        # for spheres that have changed position,
+        # reflect velocity and acceleration according to the
+        # corresponding DELTA vector
+
+        if v is not None:
+            vnorm = np.linalg.norm(v, axis=1)
+            v[changed,:] = DELTANORMED[changed,:] * vnorm[changed,None]
+
+        if a is not None:
+            anorm = np.linalg.norm(a, axis=1)
+            a[changed,:] = DELTANORMED[changed,:] * anorm[changed,None]
+
+    # return the tree
+    return T
+
 def update_collisions(x: Arr,
                       v: Arr,
                       a: Arr,
@@ -629,6 +728,66 @@ def simulate_collisions_until_no_collisions(
         pairs = T.query_pairs(distance_cutoff*scl,output_type='ndarray')
 
     return x
+
+
+
+
+def simulate_collisions_until_no_collisions_simple(
+        positions:  Arr,
+        radiuses:  Arr,
+        #distance_cutoff: float,
+        #collision_strength: float = 1.0,
+        eps: float = 1e-10,
+        attract_within_diameter: bool = False,
+        *args,
+        **kwargs,
+    ) -> Arr:
+    """
+    Simulate N hard spheres of radius `distance_cutoff/2` until
+    there's no overlap anymore.
+
+    Parameters
+    ==========
+    positions : numpy.ndarry
+        initial positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    distance_cutoff : float
+        if the centers of two sphere are below this distance
+        we consider this as a collision
+    root_mean_squared_velocity: float
+        ``sqrt(<v^2>)``, if >0, we use this to support the
+        equilibration process using verlet integration
+    dt : float, default = 0.01
+        Time advancement per step, only used for the verlet
+        integration
+    collision_strength : float, default = 1.0
+        This is the scalar that the collision-vector will be scaled with
+        at each timestep
+    releps : float, default = 1e-3
+        relative tolerance in overlap (allow overlap that is ~(1-releps)*distance_cutoff)
+
+    Returns
+    =======
+    positions : numpy.ndarry
+        final positions of the spheres.
+        two-dimensional, ``shape = (N, dim)`` where ``N`` is the number
+        of spheres and ``dim`` is the dimensionality of the problem
+    """
+
+    x = positions.copy()
+
+    N = x.shape[0]
+
+    while True:
+
+        result = update_collisions_varying_radius(x, radiuses, attract_within_diameter=attract_within_diameter,eps=eps)
+
+        if result is None:
+            break
+
+    return x
+
 
 
 
