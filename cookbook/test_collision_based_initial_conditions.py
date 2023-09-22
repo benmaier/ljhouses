@@ -10,7 +10,7 @@ if __name__=="__main__":     # pragma: no cover
     LJ_r = 8
     LJ_e = 20
     LJ_Rmax = 3*LJ_r
-    g = 0.2
+    g = 0.5
     v0 = 6
     dt = 0.01
 

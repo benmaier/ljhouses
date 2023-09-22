@@ -6,6 +6,7 @@ from scipy.spatial import KDTree
 from numpy.typing import NDArray
 from _ljhouses import StochasticBerendsenThermostat
 from ljhouses.tools import NVEThermostat, get_ideal_gas_initial_conditions, np_2d_add_at
+from tqdm import tqdm
 
 Arr = NDArray[np.float64]
 IArr = NDArray[np.int64]
@@ -123,6 +124,7 @@ def simulate(
         velocities: Arr,
         accelerations: Arr,
         thermostat: StochasticBerendsenThermostat | NVEThermostat = None,
+        show_progress : bool = False,
     ) -> tuple[Samples, Arr, Arr, Arr, Arr]:
     """
     Run an MD simulation of LJ spheres in a linear potential,
@@ -164,6 +166,8 @@ def simulate(
     thermostat : StochasticBerendsenThermostat | NVEThermostat, default = None
         The thermostat to use to equilibrate. Passing `None` or `NVEThermostat`
         will both result in simulating an NVE ensemble
+    show_progress : bool default = False
+        Show progress bar with simulation state
 
     Returns
     =======
@@ -202,6 +206,9 @@ def simulate(
     potential_energy = [np.sum(compute_gravitational_force_and_energy(positions, g)[1])]
     interaction_energy = [np.sum(compute_LJ_force_and_energy(positions, LJ_r, LJ_e, LJ_Rmax)[1])]
 
+    if show_progress:
+        bar = tqdm(total=N_sampling_rounds*N_steps_per_sample)
+
     for sample in range(N_sampling_rounds):
         for step in range(N_steps_per_sample):
             x, v, a, K, V, Vij = update_verlet(x, v, a, dt, LJ_r, LJ_e, LJ_Rmax, g)
@@ -213,6 +220,10 @@ def simulate(
             kinetic_energy.append(K)
             potential_energy.append(V)
             interaction_energy.append(Vij)
+
+            if show_progress:
+                bar.update()
+
         samples.append((x.copy(),v.copy(),a.copy()))
         if len(samples) > max_samples:
             samples = samples[1:]
@@ -382,7 +393,7 @@ def simulate_collisions_once(
         **kwargs,
     ) -> tuple[Arr, Arr, Arr, float, float, float]:
     """
-    Run an collision simulation of LJ spheres, once.
+    Run a collision simulation of LJ spheres, once.
 
     Parameters
     ==========
@@ -469,6 +480,7 @@ def get_close_to_equilibrium_initial_conditions(
         LJ_r: float,
         g: float,
         dt: float,
+        cutoff_factor: float = 0.98,
         *args,
         **kwargs,
     ) -> tuple[Arr, Arr, Arr]:
@@ -476,7 +488,7 @@ def get_close_to_equilibrium_initial_conditions(
     Initiate an ideal gas from kinetic gas theory.
     Then run a collision simulation of LJ spheres of radius ``LJ_r/2``
     until there's no pairs of spheres left that are within
-    distance < 0.99*LJ_r.
+    distance < cutoff_factor*LJ_r.
     Then generate velocities according to Maxwell-Boltzmann distribution
     and set accelerations to zero.
 
@@ -498,6 +510,14 @@ def get_close_to_equilibrium_initial_conditions(
         gravitational constant of linear gravitational potential
     dt : float
         Time advancement per step
+    cutoff_factor : float or str, default = 0.98
+        When to consider two particles to be overlapping. The cutoff
+        is calculated as ``cutoff_factor * LJ_R``. The default
+        cutoff factor will lead to a distance (diameter) that is slightly
+        below the minimum of the potential (98%). To achieve the
+        Lennard-Jones ``sigma`` parameter, i.e. the zero of the potential
+        instead, pass ``cutoff_factor = 0.891`` or
+        ``cutoff_factor=1/2**(1/6)``.
 
     Returns
     =======
@@ -515,8 +535,7 @@ def get_close_to_equilibrium_initial_conditions(
         of spheres and ``dim`` is the dimensionality of the problem
     """
 
-    LJ_sigma = LJ_r/2**(1/6.)
-    cutoff = 0.99 * LJ_r
+    cutoff = cutoff_factor * LJ_r
 
     x, v, a = get_ideal_gas_initial_conditions(N, root_mean_squared_velocity, g)
 
@@ -526,7 +545,7 @@ def get_close_to_equilibrium_initial_conditions(
     thermostat = StochasticBerendsenThermostat(root_mean_squared_velocity, N)
 
     T = KDTree(x)
-    pairs = T.query_pairs(LJ_sigma,output_type='ndarray')
+    pairs = T.query_pairs(cutoff,output_type='ndarray')
     while pairs.shape[0] != 0:
 
         T = update_collisions(x, v, a, LJ_r)
@@ -536,7 +555,7 @@ def get_close_to_equilibrium_initial_conditions(
         v = np.array(thermostat.get_thermalized_velocities(v, K))
         K = total_kinetic_energy(v)
 
-        pairs = T.query_pairs(LJ_sigma,output_type='ndarray')
+        pairs = T.query_pairs(cutoff,output_type='ndarray')
 
     return x, v0, a0
 
@@ -551,7 +570,7 @@ def simulate_collisions_until_no_collisions(
         *args,
         releps: float = 1e-3,
         **kwargs,
-    ) -> tuple[Arr, Arr, Arr]:
+    ) -> Arr:
     """
     Simulate N hard spheres of radius `distance_cutoff/2` until
     there's no overlap anymore.

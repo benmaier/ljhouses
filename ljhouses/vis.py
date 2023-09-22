@@ -1139,6 +1139,7 @@ def visualize(simulation_kwargs,
     #print(pyglet.app.platform_event_loop)
     #pyglet.app.exit()
     #print("called exit..")
+    return simstate.x, simstate.v, simstate.a
 
 
 

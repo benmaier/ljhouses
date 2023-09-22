@@ -4,6 +4,7 @@ from scipy.stats import gamma
 from scipy.spatial import KDTree
 from scipy.spatial.distance import pdist
 from numba import njit
+from scipy.optimize import curve_fit
 
 def _initial_lattice(N, LJ_r):
     """
@@ -98,6 +99,13 @@ def get_ideal_gas_from_kinetic_gas_theory(N,root_mean_squared_velocity,g):
     mean_distance_to_center = erlang_k/erlang_lambda
     return get_ideal_gas_from_theory(N, mean_distance_to_center)
 
+def get_uniform_circle(N,R):
+    theta = 2*np.pi*np.random.rand(N)
+    r = R * np.sqrt(np.random.rand(N))
+    x = r * np.cos(theta)
+    y = r * np.sin(theta)
+    return xy2pos(x,y)
+
 def pos2xy(pos):
     """Given one 2d-array of shape (N, 2), return two 1d-arrays of shape (N,)"""
     return pos[:,0], pos[:,1]
@@ -156,7 +164,7 @@ def get_random_pairs(N, p):
 
     return np.array(src), np.array(trg)
 
-def get_sampled_pairwise_distances(pos,N_pair_samples):
+def get_sampled_pairwise_distances(pos,N_pair_samples, return_pairs=False):
     """
     Return an array that contains distances
     between subsampled pairs
@@ -165,7 +173,86 @@ def get_sampled_pairwise_distances(pos,N_pair_samples):
     p = N_pair_samples / (0.5*N*(N-1))
     s, t = get_random_pairs(N, p)
     rv = pos[t,:] - pos[s,:]
-    return np.linalg.norm(rv)
+    if not return_pairs:
+        return np.linalg.norm(rv,axis=1)
+    else:
+        return np.linalg.norm(rv,axis=1), (s, t)
+
+class PowLog():
+    """
+    Easily fit a power law on a loglog-scale.
+    """
+
+    def __init__(self,xdata,ydata,extent=None):
+
+        self.xdata = np.array(xdata)
+        self.ydata = np.array(ydata)
+
+        if extent is None:
+            extent = [ np.min(self.xdata[np.where(self.xdata>0)]), np.max(self.xata) ]
+
+        ndx = np.where(np.logical_and(
+                                self.xdata >= extent[0],
+                                self.xdata <= extent[1],
+                            )
+                        )[0]
+        self.extent = np.array(extent)
+        self.x = self.xdata[ndx]
+        self.y = self.ydata[ndx]
+        self._fit()
+
+    def _fit(self):
+        self.parameters = np.polyfit(np.log(self.x), np.log(self.y), 1)
+
+    def exponent(self):
+        return self.parameters[0]
+
+    def __str__(self):
+        return f"{self.exponent():4.2f}"
+
+    def _procparms(self,parameters):
+        if len(parameters) == 0:
+            parameters = self.parameters
+        return parameters
+
+    def __call__(self,x,*parameters):
+        parameters = self._procparms(parameters)
+        return np.exp(np.polyval(self.parameters,np.log(x)))
+
+    def get_fit(self,nspacing=1001):
+        x = np.logspace(np.log(self.extent[0]),
+                        np.log(self.extent[1]),
+                        nspacing,
+                        base=np.exp(1),
+                        )
+        y = self(x)
+        return x, y
+
+    def label(self,glyph='α'):
+        return glyph + ' = ' + str(self)
+
+class PowLin(PowLog):
+    """
+    Easily fit a power law on a linear scale.
+    """
+
+    def _fit(self):
+        x, y = self.x, self.y
+        popt, pcov = curve_fit(self,x,y,p0=[1,1])
+        self.parameters = popt
+        self.pcov = pcov
+
+    def __call__(self,x,*parameters):
+        parameters = self._procparms(parameters)
+        return parameters[1]*x**parameters[0]
+
+    def get_fit(self,nspacing=1001):
+        x = np.linspace(self.extent[0],
+                        self.extent[1],
+                        nspacing,
+                        )
+        y = self(x)
+        return x, y
 
 if __name__ == "__main__":
     pos = np.random.rand(10, 2)
