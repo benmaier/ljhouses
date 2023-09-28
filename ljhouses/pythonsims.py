@@ -336,6 +336,7 @@ def update_collisions_varying_radius(
                       collision_strength: float = 1.0,
                       eps: float = 1e-10,
                       attract_within_diameter: bool = False,
+                      mass_prop_to_area: bool = True,
                       v: Arr = None,
                       a: Arr = None,
                     ):
@@ -375,17 +376,21 @@ def update_collisions_varying_radius(
         LJ_r = LJ_r[overlap_indices]
 
     # compute the amount that this single interaction should make the sphere should be move
-    D = rv * ((LJ_r-r)/2/r)[:,None]
-
-    # scale by collision strength
-    D *= collision_strength
+    D = collision_strength * (rv * ((LJ_r-r)/r)[:,None])
 
     # For each sphere, compute a Delta vector that says in which direction the sphere should move
     # from summing up all the individual contributions
     DELTA = np.zeros_like(x)
-    np_2d_add_at(DELTA, s, t, D)
+    if mass_prop_to_area:
+        mt = radiuses[t]**2
+        ms = radiuses[s]**2
+        scale = mt / (ms+mt)
+        np_2d_add_at(DELTA, s, t, D*scale[:,None], only_add_to_source=True)
+        np_2d_add_at(DELTA, t, s, -D*(1-scale[:,None]), only_add_to_source=True)
+    else:
+        np_2d_add_at(DELTA, s, t, D/2)
 
-    # Threshold this vector by demanding that the change is not more than a diameter of the speheres 
+    # Threshold this vector by demanding that the change is not more than a diameter of the spheres 
     rDELTA = np.linalg.norm(DELTA,axis=1)
     ind = np.where(rDELTA>2*radiuses)[0]
     DELTA[ind,:] = DELTA[ind,:]/rDELTA[ind,None] * 2*radiuses[ind,None]
@@ -572,6 +577,30 @@ def simulate_collisions_once(
 
     return x, v, a, K, V, Vij
 
+def simulate_simple_collisions_once_varying_radiuses(
+        positions:  Arr,
+        radiuses:  Arr,
+        Nstapes: int,
+        eps: float = 1e-10,
+        attract_within_diameter: bool = False,
+        mass_prop_to_area: bool = True,
+        *args,
+        **kwargs,
+    ) -> tuple[Arr, Arr, Arr, float, float, float]:
+
+    x = positions
+    v = np.zeros_like(x)
+    a = v
+
+    for step in range(Nsteps):
+        update_collisions_varying_radius(x, radiuses,
+                                         attract_within_diameter=attract_within_diameter,
+                                         eps=eps,
+                                         mass_prop_to_area=mass_prop_to_area,
+                                         )
+
+    return x, v, a, 0.0, 0.0, 0.0
+
 
 def get_close_to_equilibrium_initial_conditions(
         N : int,
@@ -735,10 +764,9 @@ def simulate_collisions_until_no_collisions(
 def simulate_collisions_until_no_collisions_simple(
         positions:  Arr,
         radiuses:  Arr,
-        #distance_cutoff: float,
-        #collision_strength: float = 1.0,
         eps: float = 1e-10,
         attract_within_diameter: bool = False,
+        mass_prop_to_area: bool = True,
         *args,
         **kwargs,
     ) -> Arr:
@@ -781,7 +809,7 @@ def simulate_collisions_until_no_collisions_simple(
 
     while True:
 
-        result = update_collisions_varying_radius(x, radiuses, attract_within_diameter=attract_within_diameter,eps=eps)
+        result = update_collisions_varying_radius(x, radiuses, attract_within_diameter=attract_within_diameter,eps=eps,mass_prop_to_area=mass_prop_to_area)
 
         if result is None:
             break

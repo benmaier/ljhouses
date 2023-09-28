@@ -131,13 +131,15 @@ def get_pairwise_distances_ball(pos,Rmax,T=None):
 def np_2d_add_at(subject,
               source_indices,
               target_indices,
-              what_to_add
+              what_to_add,
+              only_add_to_source = False,
               ):
     """Add values to a 2d-array at `source_indices` and subtract the same at `target_indices`"""
     np.add.at(subject[:,0], source_indices, what_to_add[:,0])
-    np.add.at(subject[:,0], target_indices, -what_to_add[:,0])
     np.add.at(subject[:,1], source_indices, what_to_add[:,1])
-    np.add.at(subject[:,1], target_indices, -what_to_add[:,1])
+    if not only_add_to_source:
+        np.add.at(subject[:,0], target_indices, -what_to_add[:,0])
+        np.add.at(subject[:,1], target_indices, -what_to_add[:,1])
 
 @njit
 def get_random_pairs(N, p):

@@ -51,6 +51,33 @@ def circle(x,R):
         y = 4 * x/np.pi/R**2 * np.arccos(x/2/R) - 2*x**2/np.pi/R**3 * np.sqrt(1-x**2/4/R**2)
     return y
 
+def square(x, L):
+
+    is_x_arr = hasattr(x, '__len__')
+    if not is_x_arr:
+        x = np.array([x])
+
+    r = x / L
+    s = r**2
+
+    y = np.zeros_like(x)
+    i0 = np.where(s<=1)[0]
+    i1 = np.where(np.logical_and(s>1, s<=2))[0]
+
+    if len(i0) > 0:
+        y0 = -4*r[i0] + np.pi + s[i0]
+        y[i0] = y0
+    if len(i1) > 0:
+        y1 = -2 - np.pi -s[i1] + 4*np.arcsin(1/r[i1]) + 4*(s[i1]-1)**0.5
+        y[i1] = y1
+
+    f = 2*r*y
+    if not is_x_arr:
+        return f[0]
+    else:
+        return f
+
+
 def circle_from_mean(x, mean):
     R = circle_R_from_mean(mean)
     return circle(x, R)
