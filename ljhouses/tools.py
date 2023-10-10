@@ -191,7 +191,7 @@ class PowLog():
         self.ydata = np.array(ydata)
 
         if extent is None:
-            extent = [ np.min(self.xdata[np.where(self.xdata>0)]), np.max(self.xata) ]
+            extent = [ np.min(self.xdata[np.where(self.xdata>0)]), np.max(self.xdata) ]
 
         ndx = np.where(np.logical_and(
                                 self.xdata >= extent[0],

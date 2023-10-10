@@ -21,7 +21,7 @@ from ljhouses import (
         _total_potential_energy,
     )
 
-from ljhouses.pythonsims import simulate_once
+from ljhouses.pythonsims import simulate_once, update_collisions_varying_radius
 
 _colors = [
             '#00997D', # paolo veronese green
@@ -659,6 +659,8 @@ def get_network_batch(x, y,
         - `batch` : the pyglet Batch instance that contains all of the objects
     """
     radius = diameter/2
+    if not hasattr(radius, '__len__'):
+        radius = [radius for i in range(x.shape[0])]
 
     batch = pyglet.graphics.Batch()
 
@@ -680,7 +682,7 @@ def get_network_batch(x, y,
                 disks[id] = \
                         shapes.Circle(_x,
                                       _y,
-                                      radius,
+                                      radius[id],
                                       segments=n_circle_segments,
                                       color=tuple(bytes.fromhex(node_color[1:])),
                                       batch=batch,
@@ -689,7 +691,7 @@ def get_network_batch(x, y,
                 circles[id] = \
                         shapes.Arc(_x,
                                    _y,
-                                   radius,
+                                   radius[id],
                                    segments=n_circle_segments,
                                    color=tuple(bytes.fromhex(node_stroke_color[1:])),
                                    batch=batch,
@@ -699,8 +701,8 @@ def get_network_batch(x, y,
                         shapes.Rectangle(
                                       _x,
                                       _y,
-                                      2*radius,
-                                      2*radius,
+                                      2*radius[id],
+                                      2*radius[id],
                                       color=tuple(bytes.fromhex(node_color[1:])),
                                       batch=batch)
 
@@ -1142,6 +1144,183 @@ def visualize(simulation_kwargs,
     return simstate.x, simstate.v, simstate.a
 
 
+def visualize_collisions(
+              simulation_kwargs,
+              config=None,
+              ignore_energies=[],
+              width=800,
+            ):
+    """
+    Start a visualization of a simulation.
+
+    Parameters
+    ==========
+    simulation_kwargs : dict
+        Keyword arguments of a simulation, will be fed to :func:`ljhouses.simulate_once`.
+    N_steps_per_frame : int
+        How many steps to simulate per frame of the visualization
+    config : dict, default = None
+        A dictionary containing all possible configuration
+        options. Entries in this dictionary will overwrite
+        the default config which is
+
+        .. code:: python
+
+            _default_config = {
+                        'plot_sampled_curve': True,
+                        'draw_links':True,
+                        'draw_nodes':True,
+                        'n_circle_segments':16,
+                        'plot_height':120,
+                        'bgcolor':'#253237',
+                        'curve_stroke_width':4.0,
+                        'node_stroke_width':1.0,
+                        'link_color': '#4b5a62',
+                        'node_stroke_color':'#000000',
+                        'node_color':'#264653',
+                        'bound_increase_factor':1.0,
+                        'update_dt':0.04,
+                        'show_curves':True,
+                        'draw_nodes_as_rectangles':False,
+                        'show_legend': True,
+                        'legend_font_color':'#fafaef',
+                        'legend_font_size':10,
+                        'padding':10,
+                        'compartment_colors':_colors
+                    }
+    ignore_energies : list, default = []
+        List of energy curves that are supposed to be
+        ignored when plotted. Can be ``'E'``, ``'K'``, ``'V'``, or ``'Vij'``
+    width : int, default = 800
+        width of the particle visualization
+    simulation_api : 'py' or 'cpp' or function, default = 'py'
+        which API to use for simulations (Python is faster)
+
+    """
+
+    x = simulation_kwargs.pop('positions')
+    v = np.zeros_like(x)
+    a = np.zeros_like(x)
+    N = x.shape[0]
+    radiuses = simulation_kwargs['radiuses']
+
+    height = width
+    main_width = width
+    main_height = height
+
+    simulate = update_collisions_varying_radius
+
+    # update the config and compute some helper variables
+    cfg = deepcopy(_default_config)
+    if config is not None:
+        cfg.update(config)
+
+
+    bgcolor = [ _/255 for _ in list(bytes.fromhex(cfg['bgcolor'][1:])) ] + [1.0]
+
+    maxx = max(np.abs(x[:,0])) * 1.1
+    maxy = max(np.abs(x[:,1])) * 1.1
+    maxxx = max(maxx, maxy)
+
+    main_scl = Scale(bound_increase_factor=cfg['nodes_bound_increase_factor'],is_square_domain=True)\
+                        .extent(0,main_width,height,0)\
+                        .domain(-maxxx,maxxx,-maxxx,maxxx)
+    winx, winy = main_scl.scale(x[:,0],x[:,1])
+    win_diameters = np.array([ 2*main_scl.scale_dist(radius) for radius in radiuses ])
+
+
+
+    # get the OpenGL shape objects that comprise the network
+    network_batch = get_network_batch(winx,winy,
+                                      win_diameters,
+                                      draw_nodes_as_rectangles=cfg['draw_nodes_as_rectangles'],
+                                      n_circle_segments=cfg['n_circle_segments'],
+                                      node_color=cfg['node_color'],
+                                      node_stroke_color=cfg['node_stroke_color'],
+                                      )
+    disks = network_batch['disks']
+    circles = network_batch['circles']
+    batch = network_batch['batch']
+
+    # initialize a simulation state that has to passed to the app
+    # so the app can change simulation parameters
+    simstate = SimulationStatus(N, 1)
+    simstate.update(x, v, a)
+
+    # intialize app
+    size = (width, height)
+    window = App(*size,simulation_status=simstate,resizable=True)
+    glClearColor(*bgcolor)
+
+    # handle different strokewidths
+    #if 'nodeStrokeWidth' in network:
+    #    node_stroke_width = network['nodeStrokeWidth'] 
+    #else:
+    node_stroke_width = cfg['node_stroke_width']
+
+    def _set_linewidth_nodes():
+        glLineWidth(node_stroke_width)
+
+    # add the network batch with the right function to set the linewidth
+    # prior to drawing
+    window.add_batch(batch,prefunc=_set_linewidth_nodes)
+
+    # decide whether to plot all measured changes or only discrete-time samples
+    discrete_plot = True
+
+    # initialize time arrays
+
+    # define the pyglet-App update function that's called on every clock cycle
+    def update(dt):
+
+        # skip if nothing remains to be done
+        if simstate.simulation_ended or simstate.paused:
+            return
+
+        # get N_steps_per_frame
+        N_steps_per_frame = simstate.N_steps_per_frame
+
+        # Advance the simulation until time N_steps_per_frame.
+        # sim_time is a numpy array including all time values at which
+        # the system state changed. The first entry is the initial state
+        # of the simulation at t = 0 which we will discard later on
+        # the last entry at `N_steps_per_frame` will be missing so we
+        # have to add it later on.
+        # `sim_result` is a dictionary that maps a compartment
+        # to a numpy array containing the compartment counts at
+        # the corresponding time.
+        x = simstate.x
+        simulate(x, **simulation_kwargs)
+
+        simstate.update(x, v, a)
+
+        # if nothing changed, evaluate the true total event rate
+        # and if it's zero, do not do anything anymore
+        #did_simulation_end = len(ndx) == 0 and model.get_true_total_event_rate() == 0.0
+        #simstate.set_simulation_status(did_simulation_end)
+        if simstate.simulation_ended:
+            return
+
+        # advance the current time as described above.
+        # we save both all time values as well as just the sampled times.
+
+        pos = np.array(x)
+        x = pos[:,0]
+        y = pos[:,1]
+        main_scl.check_square_bounds_centered_on_origin(x, y)
+        _x, _y = main_scl.scale(x,y)
+        for id, (__x, __y) in enumerate(zip(_x,_y)):
+            R = main_scl.scale_dist(radiuses[id])
+            disks[id].x = __x
+            disks[id].y = __y
+            disks[id].radius = R
+            circles[id].x = __x
+            circles[id].y = __y
+            circles[id]._radius = R
+
+
+    pyglet.clock.schedule_interval(update, cfg['update_dt'])
+    pyglet.app.run()
 
 if __name__=="__main__":     # pragma: no cover
 
