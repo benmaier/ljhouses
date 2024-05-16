@@ -114,7 +114,8 @@ plot_configuration(xnew, R, ax[1])
 ax[1].set_title('after running collision detection')
 ```
 
-![Collision simulation](https://github.com/benmaier/ljhouses/blob/main/cookbook/collision_example.png)
+![Collision simulation](https://github.com/benmaier/ljhouses/blob/main/cookbook/collision/collision_example.png?raw=true)
+                        
 
 ## Changelog
 
