@@ -184,6 +184,7 @@ class PowLog():
     """
     Easily fit a power law on a loglog-scale.
     """
+    a = None
 
     def __init__(self,xdata,ydata,extent=None):
 
@@ -207,7 +208,10 @@ class PowLog():
         self.parameters = np.polyfit(np.log(self.x), np.log(self.y), 1)
 
     def exponent(self):
-        return self.parameters[0]
+        if self.a is not None:
+            return self.a
+        else:
+            return self.parameters[0]
 
     def __str__(self):
         return f"{self.exponent():4.2f}"
@@ -222,10 +226,9 @@ class PowLog():
         return np.exp(np.polyval(self.parameters,np.log(x)))
 
     def get_fit(self,nspacing=1001):
-        x = np.logspace(np.log(self.extent[0]),
-                        np.log(self.extent[1]),
+        x = np.logspace(np.log10(self.extent[0]),
+                        np.log10(self.extent[1]),
                         nspacing,
-                        base=np.exp(1),
                         )
         y = self(x)
         return x, y
@@ -256,7 +259,57 @@ class PowLin(PowLog):
         y = self(x)
         return x, y
 
+class FixedPowLin(PowLog):
+    """
+    Easily fit a power law on a linear scale.
+    """
+    def __init__(self,xdata,ydata,exponent,extent=None):
+        self.a = exponent
+        super().__init__(xdata,ydata,extent)
+
+    def _fit(self):
+        x, y = self.x, self.y
+        popt, pcov = curve_fit(self,x,y,p0=[1])
+        self.parameters = popt
+        self.pcov = pcov
+
+    def __call__(self,x,*parameters):
+        parameters = self._procparms(parameters)
+        return parameters[0]*x**self.a
+
+    def get_fit(self,nspacing=1001):
+        x = np.linspace(self.extent[0],
+                        self.extent[1],
+                        nspacing,
+                      )
+        y = self(x)
+        return x, y
+
+class FixedPowLog(FixedPowLin):
+    """
+    Easily fit a power law on a log scale.
+    """
+
+    def _fit(self):
+        x, y = self.x, np.log(self.y)
+        popt, pcov = curve_fit(self._log_self,x,y,p0=[1])
+        self.parameters = popt
+        self.pcov = pcov
+
+    def _log_self(self,x,*parameters):
+        return np.log(self(x,*parameters))
+
+    def get_fit(self,nspacing=1001):
+        x = np.logspace(np.log10(self.extent[0]),
+                        np.log10(self.extent[1]),
+                        nspacing,
+                      )
+        y = self(x)
+        return x, y
+
+
 if __name__ == "__main__":
     pos = np.random.rand(10, 2)
     print(get_sampled_pairwise_distances(pos,10))
     print(get_random_pairs(10,10/45))
+
