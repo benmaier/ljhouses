@@ -101,7 +101,7 @@ setup(
     ext_modules = ext_modules,
     tests_require=['pytest', 'pytest-cov'],
     setup_requires = [
-            'pybind11>=2.0.0'
+            'pybind11>=2.0.0',
             'pytest-runner'
             ],
     install_requires = [
